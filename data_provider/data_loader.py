@@ -967,34 +967,26 @@ class UEAloader(Dataset):
 class Dataset_IE_day(Dataset):
     def __init__(
         self,
+        args,
         root_path,
         flag="train",
         size=None,
         features="MS",
         data_path="IEd1.csv",
-        target="dl",
+        target="electricity_consumption",
         scale=False,
         timeenc=0,
         freq="d",
-        province_name="广东",
-        industry_name="全社会用电总计",
-        train_start="2022-01-01",
-        train_end="2022-11-30",
-        test_start="2022-12-01",
-        test_end="2022-12-01",
-        cols=None,
+        seasonal_patterns=None,
     ):
         # size [seq_len, label_len, pred_len]
-        # info
-        if size == None:
+        if size is None:
             self.seq_len = 7 * 8
             self.label_len = 7 * 2
             self.pred_len = 7 * 4
         else:
-            self.seq_len = size[0]
-            self.label_len = size[1]
-            self.pred_len = size[2]
-        # init，添加了一个pred flag，用来预测
+            self.seq_len, self.label_len, self.pred_len = size
+
         assert flag in ["train", "test", "val", "pred"]
         type_map = {"train": 0, "val": 1, "test": 2, "pred": 3}
         self.set_type = type_map[flag]
@@ -1004,15 +996,7 @@ class Dataset_IE_day(Dataset):
         self.scale = scale
         self.timeenc = timeenc
         self.freq = freq
-
-        # 自定义参数
-        self.province_name = province_name
-        self.industry_name = industry_name
-        self.train_start = train_start
-        self.train_end = train_end
-        self.test_start = test_start
-        self.test_end = test_end
-        self.cols = cols
+        self.args = args
 
         self.root_path = root_path
         self.data_path = data_path
@@ -1022,35 +1006,25 @@ class Dataset_IE_day(Dataset):
         self.scaler = StandardScaler()
         df_raw = pd.read_pickle(os.path.join(self.root_path, self.data_path))
         df_raw.query(
-            f'province_name == "{self.province_name}" and industry_name == "{self.industry_name}"',
+            f'province_name == "{self.args.province_name}" and industry_name == "{self.args.industry_name}"',
             inplace=True,
         )
 
-        """
-        df_raw.columns: ['date', ...(other features), target feature]
-        """
-        # 筛选部分特征
-        if self.cols:
-            cols = [col.strip() for col in self.cols.split(",")]
+        if self.args.cols:
+            cols = [col.strip() for col in self.args.cols.split(",")]
         else:
             cols = list(df_raw.columns)
         cols = [col for col in cols if col not in [self.target, "date"]]
         df_raw = df_raw[["date"] + cols + [self.target]]
-        # print(cols)
 
-        # 如果不是预测任务的话
         if self.set_type != 3:
-            # 自定义，按时间段划分
             df_raw["date"] = pd.to_datetime(df_raw["date"])
-            # 方便用时间戳进行索引
             df_raw.set_index("date", inplace=True)
             df_raw.sort_index(ascending=True, inplace=True)
-            # 只要构建训练集的这些时间的数据，超出的不要了
-            df_raw = df_raw[self.train_start : self.test_end]
+            df_raw = df_raw[self.args.train_start : self.args.test_end]
 
-            # 只要头train、尾test，剩下的是中间的vali
-            num_train = df_raw[self.train_start : self.train_end].shape[0]
-            num_test = df_raw[self.test_start : self.test_end].shape[0]
+            num_train = df_raw[self.args.train_start : self.args.train_end].shape[0]
+            num_test = df_raw[self.args.test_start : self.args.test_end].shape[0]
             num_vali = len(df_raw) - num_train - num_test
 
             df_raw.reset_index(drop=False, inplace=True)
@@ -1064,9 +1038,61 @@ class Dataset_IE_day(Dataset):
             border1 = border1s[self.set_type]
             border2 = border2s[self.set_type]
         else:
-            # 预测的话就是使用最后的[-self.seq_len: ]即可
-            border1 = -self.seq_len
-            border2 = len(df_raw)
+            df_raw["date"] = pd.to_datetime(df_raw["date"])
+            df_raw.sort_values(by="date", ascending=True, inplace=True)
+            df_raw.reset_index(drop=True, inplace=True)
+
+            if self.args.pred_start:
+                pred_start_date = pd.to_datetime(self.args.pred_start)
+            else:
+                pred_start_date = df_raw[-self.args.pred_start]["date"]
+
+            all_date_set = set(pd.to_datetime(df_raw["date"]).values)
+
+            pred_start_lookback_start_date = pred_start_date - pd.Timedelta(
+                days=self.seq_len
+            )
+            pred_start_seq_len_set = set(
+                pd.date_range(
+                    start=pred_start_lookback_start_date,
+                    periods=self.seq_len,
+                    freq="D",
+                ).values
+            )
+            if not pred_start_seq_len_set.issubset(all_date_set):
+                raise ValueError(
+                    f"数据集中没有{self.args.pred_start}往前{self.seq_len}个长度的历史数据以预测{self.args.pred_start}"
+                )
+
+            if not self.args.pred_end:
+                pred_end_date = pred_start_date
+            else:
+                pred_end_date = pd.to_datetime(self.args.pred_end)
+
+            if (
+                (pred_end_date - pred_start_date).days + 1
+            ) > self.pred_len and not self.args.is_autoregression:
+                raise ValueError(
+                    f"需预测长度大于{self.pred_len}，且不使用自回归的方式预测，模型不支持此类预测"
+                )
+
+            border1 = df_raw[df_raw["date"] == pred_start_lookback_start_date].index[0]
+
+            border2_date = pred_end_date + pd.Timedelta(days=self.pred_len)
+            need_dates = list(
+                pd.date_range(
+                    start=pred_start_lookback_start_date,
+                    end=border2_date,
+                    freq="D",
+                ).values
+            )
+            for tmp_date in need_dates:
+                if tmp_date in all_date_set:
+                    continue
+                df_raw.loc[len(df_raw)] = [None] * len(df_raw.columns)
+                df_raw.loc[len(df_raw) - 1, "date"] = tmp_date
+
+            border2 = df_raw[df_raw["date"] == border2_date].index[0]
 
         if self.features == "M" or self.features == "MS":
             cols_data = df_raw.columns[1:]

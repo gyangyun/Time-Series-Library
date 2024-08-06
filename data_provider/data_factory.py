@@ -16,7 +16,7 @@ data_dict = {
     'SMD': SMDSegLoader,
     'SWAT': SWATSegLoader,
     'UEA': UEAloader,
-    'IEd': Dataset_IE_day
+    'IEd1': Dataset_IE_day
 }
 
 

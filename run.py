@@ -109,9 +109,9 @@ if __name__ == '__main__':
     parser.add_argument('--p_hidden_layers', type=int, default=2, help='number of hidden layers in projector')
 
     # metrics (dtw)
-    parser.add_argument('--use_dtw', type=bool, default=False, 
+    parser.add_argument('--use_dtw', type=bool, default=False,
                         help='the controller of using dtw metric (dtw is time consuming, not suggested unless necessary)')
-    
+
     # Augmentation
     parser.add_argument('--augmentation_ratio', type=int, default=0, help="How many times to augment")
     parser.add_argument('--seed', type=int, default=2, help="Randomization seed")
@@ -131,6 +131,18 @@ if __name__ == '__main__':
     parser.add_argument('--discdtw', default=False, action="store_true", help="Discrimitive DTW warp preset augmentation")
     parser.add_argument('--discsdtw', default=False, action="store_true", help="Discrimitive shapeDTW warp preset augmentation")
     parser.add_argument('--extra_tag', type=str, default="", help="Anything extra")
+
+
+    parser.add_argument('--province_name', type=str, default="", help="province name")
+    parser.add_argument('--industry_name', type=str, default="", help="industry name")
+    parser.add_argument('--train_start', type=str, default="", help="train start")
+    parser.add_argument('--train_end', type=str, default="", help="train end")
+    parser.add_argument('--test_start', type=str, default="", help="test start")
+    parser.add_argument('--test_end', type=str, default="", help="test end")
+    parser.add_argument('--pred_start', type=str, default="", help="pred start")
+    parser.add_argument('--pred_end', type=str, default="", help="pred end")
+    parser.add_argument('--is_autoregression', type=bool, default=False, help="pred end")
+    parser.add_argument('--cols', type=str, default="", help="columns")
 
     args = parser.parse_args()
     # args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
@@ -215,6 +227,11 @@ if __name__ == '__main__':
             args.des, ii)
 
         exp = Exp(args)  # set experiments
-        print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-        exp.test(setting, test=1)
+        # print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+        # exp.test(setting, test=1)
+        # torch.cuda.empty_cache()
+
+        print('>>>>>>>predicting : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+        exp.predict(setting)
         torch.cuda.empty_cache()
+

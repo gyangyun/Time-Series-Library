@@ -292,7 +292,9 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         if load:
             print("loading model")
-            best_model_path = os.path.join(self.args.checkpoints, setting, "checkpoint.pth")
+            best_model_path = os.path.join(
+                self.args.checkpoints, setting, "checkpoint.pth"
+            )
             self.model.load_state_dict(
                 torch.load(best_model_path, map_location=self.device)
             )
@@ -301,26 +303,122 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         self.model.eval()
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(
-                pred_loader
-            ):
-                batch_x = batch_x.float().to(self.device)
-                batch_y = batch_y.float()
-                batch_x_mark = batch_x_mark.float().to(self.device)
-                batch_y_mark = batch_y_mark.float().to(self.device)
+            if self.args.is_autoregression:
+                all_batch_x, all_batch_y, all_batch_x_mark, all_batch_y_mark = [], [], [], []
+                for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(pred_loader):
+                    all_batch_x.append(batch_x)
+                    all_batch_y.append(batch_y)
+                    all_batch_x_mark.append(batch_x_mark)
+                    all_batch_y_mark.append(batch_y_mark)
 
-                # decoder input
-                dec_inp = torch.zeros(
-                    [batch_y.shape[0], self.args.pred_len, batch_y.shape[2]]
-                ).float()
-                dec_inp = (
-                    torch.cat([batch_y[:, : self.args.label_len, :], dec_inp], dim=1)
-                    .float()
-                    .to(self.device)
+                all_batch_x = torch.cat(all_batch_x, dim=0).float().to(self.device)
+                all_batch_y = torch.cat(all_batch_y, dim=0).float().to(self.device)
+                all_batch_x_mark = (
+                    torch.cat(all_batch_x_mark, dim=0).float().to(self.device)
                 )
-                # encoder - decoder
-                if self.args.use_amp:
-                    with torch.cuda.amp.autocast():
+                all_batch_y_mark = (
+                    torch.cat(all_batch_y_mark, dim=0).float().to(self.device)
+                )
+
+                for i in range(all_batch_x.shape[0]):
+                    # 提取当前时间步的数据
+                    current_x = all_batch_x[i, :, :].unsqueeze(0)
+                    current_y = all_batch_y[i, :, :].unsqueeze(0)
+                    current_x_mark = all_batch_x_mark[i, :, :].unsqueeze(0)
+                    current_y_mark = all_batch_y_mark[i, :, :].unsqueeze(0)
+
+                    dec_inp = (
+                        torch.zeros(
+                            [current_y.shape[0], self.args.pred_len, current_y.shape[2]]
+                        )
+                        .float()
+                        .to(self.device)
+                    )
+                    dec_inp = (
+                        torch.cat(
+                            [current_y[:, : self.args.label_len, :], dec_inp], dim=1
+                        )
+                        .float()
+                        .to(self.device)
+                    )
+
+                    if self.args.use_amp:
+                        with torch.cuda.amp.autocast():
+                            if self.args.output_attention:
+                                current_outputs = self.model(
+                                    current_x, current_x_mark, dec_inp, current_x_mark
+                                )[0]
+                            else:
+                                current_outputs = self.model(
+                                    current_x, current_x_mark, dec_inp, current_x_mark
+                                )
+                    else:
+                        if self.args.output_attention:
+                            current_outputs = self.model(
+                                current_x, current_x_mark, dec_inp, current_x_mark
+                            )[0]
+                        else:
+                            current_outputs = self.model(
+                                current_x, current_x_mark, dec_inp, current_x_mark
+                            )
+
+                    f_dim = -1 if self.args.features == "MS" else 0
+                    # 取出本次预测的所有步长，因为是逐条数据预测，所以第一维只有1
+                    current_outputs = current_outputs[:, -self.args.pred_len :, :]
+                    # 只要下一个步长的预测结果
+                    current_outputs = current_outputs[:, :1, f_dim:]
+
+                    # 将未逆标准化的预测结果更新到all_batch_x中以用于下一时间步的预测，以及all_batch_y中的enc_input部分
+                    # 最后一次预测就不需要更新了，不然会数组读取溢出
+                    if i + 1 < all_batch_x.shape[0]:
+                        all_batch_x[i + 1, -1, f_dim:] = current_outputs
+                        all_batch_y[i + 1, -self.args.pred_len-1, f_dim:] = current_outputs
+
+                    current_outputs = current_outputs.detach().cpu().numpy()
+                    # 将逆标准化的预测结果添加到最终预测结果中
+                    if pred_data.scale and self.args.inverse:
+                        shape = current_outputs.shape
+                        current_outputs = pred_data.inverse_transform(
+                            current_outputs.reshape(shape[0] * shape[1], -1)
+                        ).reshape(shape)
+
+                    preds.append(current_outputs)
+
+            else:
+                for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(
+                    pred_loader
+                ):
+                    batch_x = batch_x.float().to(self.device)
+                    batch_y = batch_y.float().to(self.device)
+                    batch_x_mark = batch_x_mark.float().to(self.device)
+                    batch_y_mark = batch_y_mark.float().to(self.device)
+
+                    dec_inp = (
+                        torch.zeros(
+                            [batch_y.shape[0], self.args.pred_len, batch_y.shape[2]]
+                        )
+                        .float()
+                        .to(self.device)
+                    )
+                    dec_inp = (
+                        torch.cat(
+                            [batch_y[:, : self.args.label_len, :], dec_inp], dim=1
+                        )
+                        .float()
+                        .to(self.device)
+                    )
+
+                    if self.args.use_amp:
+                        with torch.cuda.amp.autocast():
+                            if self.args.output_attention:
+                                outputs = self.model(
+                                    batch_x, batch_x_mark, dec_inp, batch_y_mark
+                                )[0]
+                            else:
+                                outputs = self.model(
+                                    batch_x, batch_x_mark, dec_inp, batch_y_mark
+                                )
+                    else:
                         if self.args.output_attention:
                             outputs = self.model(
                                 batch_x, batch_x_mark, dec_inp, batch_y_mark
@@ -329,33 +427,24 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                             outputs = self.model(
                                 batch_x, batch_x_mark, dec_inp, batch_y_mark
                             )
-                else:
-                    if self.args.output_attention:
-                        outputs = self.model(
-                            batch_x, batch_x_mark, dec_inp, batch_y_mark
-                        )[0]
-                    else:
-                        outputs = self.model(
-                            batch_x, batch_x_mark, dec_inp, batch_y_mark
-                        )
 
-                f_dim = -1 if self.args.features == 'MS' else 0
-                outputs = outputs[:, -self.args.pred_len:, :]
-                outputs = outputs.detach().cpu().numpy()
-                if pred_data.scale and self.args.inverse:
-                    shape = outputs.shape
-                    outputs = pred_data.inverse_transform(outputs.reshape(shape[0] * shape[1], -1)).reshape(shape)
+                    outputs = (
+                        outputs[:, -self.args.pred_len :, :].detach().cpu().numpy()
+                    )
 
-                outputs = outputs[:, :, f_dim:]
+                    if pred_data.scale and self.args.inverse:
+                        shape = outputs.shape
+                        outputs = pred_data.inverse_transform(
+                            outputs.reshape(shape[0] * shape[1], -1)
+                        ).reshape(shape)
 
-                pred = outputs
-                preds.append(pred)
+                    preds.append(outputs)
 
+        from IPython import embed;embed()
         preds = np.array(preds)
         preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
 
-        # result save
-        folder_path = os.path.join(self.args.root_path, 'results', setting)
+        folder_path = os.path.join(self.args.root_path, "results", setting)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
