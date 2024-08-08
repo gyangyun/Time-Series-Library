@@ -18,7 +18,7 @@ from sklearn.metrics import mean_absolute_percentage_error
 def plot_result(tmp_df, x, y, add_info="", dirpath=None):
     start_time = tmp_df["datetime"].min()
     end_time = tmp_df["datetime"].max()
-    timerange_info = f"{start_time}-{end_time}"
+    timerange_info = f"{start_time.strftime('%Y%m%d')}-{end_time.strftime('%Y%m%d')}"
     title = f"{timerange_info} {add_info}" if add_info else timerange_info
 
     tmp_fig = px.line(
@@ -157,7 +157,6 @@ def plot_predict_result(
                 np.array(tmp_pred).reshape(-1, 1)
             ).squeeze()
 
-        from IPython import embed;embed()
         tmp_df = pd.DataFrame(
             {"order": i, "datetime": tmp_time_range, "pred": tmp_pred}
         )

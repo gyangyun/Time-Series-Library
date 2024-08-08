@@ -30,7 +30,7 @@ if __name__ == "__main__":
         default="long_term_forecast",
         help="task name, options:[long_term_forecast, short_term_forecast, imputation, classification, anomaly_detection]",
     )
-    # 新增一个2模式，表示预测。即{0: 'train', 1: 'test', 2, 'predict'}
+    # 新增一个2模式，表示预测。即{0: 'test', 1: 'train', 2, 'predict'}
     parser.add_argument(
         "--is_training", type=int, required=True, default=1, help="status"
     )
@@ -348,7 +348,7 @@ if __name__ == "__main__":
     # 注意：pred_end表示预测数据集中能预测的边界
     parser.add_argument("--pred_end", type=str, default="", help="pred end")
     parser.add_argument(
-        "--is_autoregression", type=bool, default=False, help="is autoregression flag"
+        "--is_autoregression", type=int, default=0, help="is autoregression flag"
     )
     parser.add_argument("--cols", type=str, default="", help="columns")
 
