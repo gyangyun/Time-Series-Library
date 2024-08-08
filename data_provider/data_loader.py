@@ -1006,7 +1006,7 @@ class Dataset_IE_day(Dataset):
         self.scaler = StandardScaler()
         df_raw = pd.read_pickle(os.path.join(self.root_path, self.data_path))
         df_raw.query(
-            f'province_name == "{self.args.province_name}" and industry_name == "{self.args.industry_name}"',
+            f'province_name == "{self.args.province_name}" and order_no == {self.args.order_no}',
             inplace=True,
         )
 
@@ -1049,6 +1049,7 @@ class Dataset_IE_day(Dataset):
 
             all_date_set = set(pd.to_datetime(df_raw["date"]).values)
 
+            # 先校验数据集中是否有足够的数据预测pred_start
             pred_start_lookback_start_date = pred_start_date - pd.Timedelta(
                 days=self.seq_len
             )
@@ -1069,30 +1070,68 @@ class Dataset_IE_day(Dataset):
             else:
                 pred_end_date = pd.to_datetime(self.args.pred_end)
 
-            if (
-                (pred_end_date - pred_start_date).days + 1
-            ) > self.pred_len and not self.args.is_autoregression:
-                raise ValueError(
-                    f"需预测长度大于{self.pred_len}，且不使用自回归的方式预测，模型不支持此类预测"
+            # 如果不使用自回归
+            if not self.args.is_autoregression:
+                # 校验待预测的时间长度和模型能够预测的时间长度
+                to_pred_len = (pred_end_date - pred_start_date).days + 1
+                if to_pred_len > self.pred_len:
+                    raise ValueError(
+                        f"待预测长度【{to_pred_len}】，大于模型能预测长度【{self.pred_len}】，且不使用自回归的方式预测，无法支持该预测任务"
+                    )
+
+                border1 = df_raw[df_raw["date"] == pred_start_lookback_start_date].index[0]
+                # 因为不使用自回归，且模型能预测的长度大于待预测的长度
+                # 所以只需要预测一次，让获取到的(x, y)中的y[0]为pred_start_date对应时间
+                # 从而将x输入模型，生成的pred_y中的pred_y[0]也是pred_start_date对应时间
+                # 在预测时从预测结果中截取出待预测结果就行
+                border2_date = pred_start_date + pd.Timedelta(
+                    days=self.pred_len
                 )
 
-            border1 = df_raw[df_raw["date"] == pred_start_lookback_start_date].index[0]
+                # 因为__len__()函数约束了每次都能获取seq_len长度的x和pred_len长度的y
+                # 只有手动补全才能保障获取到的最后一组(x, y)中的y[0]为pred_start_date对应时间
+                # 从而将x输入模型，生成的pred_y中的pred_y[0]也是pred_start_date对应时间
+                need_dates = list(
+                    pd.date_range(
+                        start=pred_start_lookback_start_date,
+                        end=border2_date,
+                        freq="D",
+                    ).values
+                )
+                for tmp_date in need_dates:
+                    if tmp_date in all_date_set:
+                        continue
+                    df_raw.loc[len(df_raw)] = [None] * len(df_raw.columns)
+                    df_raw.loc[len(df_raw) - 1, "date"] = tmp_date
 
-            border2_date = pred_end_date + pd.Timedelta(days=self.pred_len)
-            need_dates = list(
-                pd.date_range(
-                    start=pred_start_lookback_start_date,
-                    end=border2_date,
-                    freq="D",
-                ).values
-            )
-            for tmp_date in need_dates:
-                if tmp_date in all_date_set:
-                    continue
-                df_raw.loc[len(df_raw)] = [None] * len(df_raw.columns)
-                df_raw.loc[len(df_raw) - 1, "date"] = tmp_date
+                border2 = df_raw[df_raw["date"] == border2_date].index[0]
+            # 如果使用自回归
+            else:
+                border1 = df_raw[df_raw["date"] == pred_start_lookback_start_date].index[0]
+                # 自回归的方式，无论pred_len是多长，每次只用第一个时间步长的预测结果
+                # 所以需要保证最后一个样本的预测结果中第一个时间步长为为pred_end_date
+                # 所以需要保证数据子集的边界能取到pred_end_date + pred_len
+                border2_date = pred_end_date + pd.Timedelta(
+                    days=self.pred_len
+                )
 
-            border2 = df_raw[df_raw["date"] == border2_date].index[0]
+                # 因为__len__()函数约束了每次都能获取seq_len长度的x和pred_len长度的y
+                # 只有手动补全才能保障获取到的最后一组(x, y)中的y[0]为pred_end_date对应时间
+                # 从而将x输入模型，生成的pred_y中的pred_y[0]也是pred_end_date对应时间
+                need_dates = list(
+                    pd.date_range(
+                        start=pred_start_lookback_start_date,
+                        end=border2_date,
+                        freq="D",
+                    ).values
+                )
+                for tmp_date in need_dates:
+                    if tmp_date in all_date_set:
+                        continue
+                    df_raw.loc[len(df_raw)] = [None] * len(df_raw.columns)
+                    df_raw.loc[len(df_raw) - 1, "date"] = tmp_date
+
+                border2 = df_raw[df_raw["date"] == border2_date].index[0]
 
         if self.features == "M" or self.features == "MS":
             cols_data = df_raw.columns[1:]
