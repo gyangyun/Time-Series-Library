@@ -492,9 +492,7 @@ if __name__ == "__main__":
         torch.cuda.empty_cache()
 
         # 新增代码，用于绘制test结果
-        scaler_y = joblib.load(os.path.join(args.root_path, "preprocessor_d.bin"))[
-            (args.province_name, args.order_no)
-        ]["scaler_y"]
+        scaler_y = joblib.load(os.path.join(args.root_path, "preprocessor_d.bin"))["scaler_y"]
         result_path = os.path.join(args.root_path, "results", setting)
         plot_predict_result(
             result_path,

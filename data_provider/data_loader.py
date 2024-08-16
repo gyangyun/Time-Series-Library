@@ -1005,10 +1005,6 @@ class Dataset_IE_day(Dataset):
     def __read_data__(self):
         self.scaler = StandardScaler()
         df_raw = pd.read_pickle(os.path.join(self.root_path, self.data_path))
-        df_raw.query(
-            f'province_name == "{self.args.province_name}" and order_no == {self.args.order_no}',
-            inplace=True,
-        )
 
         if self.args.cols:
             cols = [col.strip() for col in self.args.cols.split(",")]
