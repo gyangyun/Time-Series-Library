@@ -333,7 +333,7 @@ def create_parser():
 
     # 新增的自定义参数
     parser.add_argument("--province_name", type=str, default="", help="province name")
-    parser.add_argument("--order_no", type=int, default=1, help="industry order_no number")
+    parser.add_argument("--industry_id", type=str, default="", help="industry id")
     parser.add_argument("--train_start", type=str, default="", help="train start")
     parser.add_argument("--train_end", type=str, default="", help="train end")
     parser.add_argument("--test_start", type=str, default="", help="test start")
@@ -434,13 +434,12 @@ if __name__ == "__main__":
         exp.test(setting, load=True)
 
         # 新增代码，用于绘制test结果
-        scaler_y = joblib.load(os.path.join(args.root_path, "preprocessor_d.bin"))[
-            (args.province_name, args.order_no)
-        ]["scaler_y"]
-        result_path = os.path.join(args.root_path, "results", setting)
+        scaler_y = joblib.load(os.path.join(args.root_path, "preprocessor.bin"))["scaler_y"]
+        result_path = os.path.join(args.root_path, setting, "test_results", "data")
+        fig_path = os.path.join(args.root_path, setting, "test_results", "figure")
         plot_test_result(
             result_path,
-            result_path,
+            fig_path,
             args.test_start,
             args.test_end,
             args.freq,
@@ -458,11 +457,12 @@ if __name__ == "__main__":
         torch.cuda.empty_cache()
 
         # 新增代码，用于绘制test结果
-        scaler_y = joblib.load(os.path.join(args.root_path, "preprocessor_d.bin"))["scaler_y"]
-        result_path = os.path.join(args.root_path, "results", setting)
+        scaler_y = joblib.load(os.path.join(args.root_path, "preprocessor.bin"))["scaler_y"]
+        result_path = os.path.join(args.root_path, setting, "predict_results", "data")
+        fig_path = os.path.join(args.root_path, setting, "predict_results", "figure")
         plot_predict_result(
             result_path,
-            result_path,
+            fig_path,
             args.pred_start,
             args.pred_end,
             args.freq,

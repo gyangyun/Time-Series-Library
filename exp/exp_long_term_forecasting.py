@@ -235,7 +235,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         preds = []
         trues = []
-        folder_path = os.path.join(self.args.root_path, "test_results", setting)
+        folder_path = os.path.join(self.args.root_path, setting, "test_results", "figure")
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
@@ -320,7 +320,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         print("test shape:", preds.shape, trues.shape)
 
         # result save
-        folder_path = os.path.join(self.args.root_path, "results", setting)
+        folder_path = os.path.join(self.args.root_path, setting, "test_results", "data")
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
@@ -539,7 +539,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             else:
                 preds = preds
 
-        folder_path = os.path.join(self.args.root_path, "results", setting)
+        folder_path = os.path.join(self.args.root_path, setting, "predict_results", "data")
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
