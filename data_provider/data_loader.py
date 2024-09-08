@@ -1007,7 +1007,7 @@ class Dataset_IE_day(Dataset):
         df_raw = pd.read_pickle(os.path.join(self.root_path, self.data_path))
 
         if self.args.cols:
-            cols = [col.strip() for col in self.args.cols.split(",")]
+            cols = [col.strip() for col in self.args.cols.split()]
         else:
             cols = list(df_raw.columns)
         cols = [col for col in cols if col not in [self.target, "date"]]

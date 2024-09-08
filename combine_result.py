@@ -3,7 +3,6 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-
 from run import create_parser, create_setting
 
 
@@ -103,7 +102,9 @@ def load_and_concatenate_results(args, is_merge_qsh, is_merge_qw, output_path=No
             "[6]B、城乡居民生活用电合计",
             "[9]C、趸售",
         ]
-        industry_id_lite_df = concatenated_df.query("industry_id in @industry_id_lite_l")
+        industry_id_lite_df = concatenated_df.query(
+            "industry_id in @industry_id_lite_l"
+        )
         qsh_df = merge_df(
             industry_id_lite_df,
             by_cols=["province_name", "datetime"],
@@ -129,18 +130,85 @@ def load_and_concatenate_results(args, is_merge_qsh, is_merge_qw, output_path=No
         )
         concatenated_df = pd.concat([concatenated_df, qsh_df], axis=0)
 
-    if not output_path:
-        output_path = (
-            Path(args.dataset_path)
-            / f"predict_results_{args.pred_start}_{args.pred_start}"
-            / "real_prediction.csv"
-        )
-
-        if not output_path.parent.is_dir():
-            output_path.parent.mkdir(parents=True)
-
-    concatenated_df.to_csv(output_path, index=False)
     return concatenated_df
+
+
+def post_processing(
+    df,
+    space_col="province_name",
+    time_col="date_time",
+    id_col="industry_id",
+    value_col="pred_value",
+):
+    date_df = df.rename(
+        columns={
+            space_col: "province_name",
+            time_col: "date",
+            id_col: "industry_id",
+            value_col: "electricity_consumption",
+        }
+    )
+    date_df["order_no"] = date_df["industry_id"].str.extract(r"\[(\d+)\]").astype("int")
+    date_df["year"] = date_df["date"].dt.year
+    date_df["month"] = date_df["date"].dt.month
+
+    # 日电量明细
+    date_df = date_df[
+        [
+            "province_name",
+            "order_no",
+            "industry_id",
+            "year",
+            "month",
+            "date",
+            "electricity_consumption",
+        ]
+    ]
+    # 月电量明细
+    month_df = date_df.groupby(
+        by=["province_name", "order_no", "industry_id", "year", "month"], as_index=False
+    )["electricity_consumption"].sum()
+
+    province_names = [
+        "广东",
+        "广西",
+        "云南",
+        "贵州",
+        "海南",
+        "全网",
+        "广东（不含广深）",
+        "广东（含广州）",
+        "广州",
+        "深圳",
+    ]
+    province_lite_names = [
+        province_name
+        for province_name in province_names
+        if province_name in month_df["province_name"].unique()
+    ]
+
+    # 日电量透视图
+    date_pvt = pd.pivot_table(
+        date_df,
+        index=["order_no", "industry_id", "year", "month","date"],
+        columns="province_name",
+        values="electricity_consumption",
+        aggfunc="sum",
+    )
+    date_pvt = date_pvt[province_lite_names]
+    date_pvt.reset_index(drop=False, inplace=True)
+
+    # 月电量透视图
+    month_pvt = pd.pivot_table(
+        date_df,
+        index=["order_no", "industry_id", "year", "month"],
+        columns="province_name",
+        values="electricity_consumption",
+        aggfunc="sum",
+    )
+    month_pvt = month_pvt[province_lite_names]
+    month_pvt.reset_index(drop=False, inplace=True)
+    return date_df, month_df, date_pvt, month_pvt
 
 
 if __name__ == "__main__":
@@ -155,4 +223,84 @@ if __name__ == "__main__":
 
     # 添加其他参数
     args = parser.parse_args()
-    df = load_and_concatenate_results(args, is_merge_qsh=True, is_merge_qw=True)
+    # 合并预测结果
+    date_df = load_and_concatenate_results(args, is_merge_qsh=True, is_merge_qw=True)
+    # =========================处理预测数据=========================
+    date_df, month_df, date_pvt, month_pvt = post_processing(
+        date_df,
+        space_col="province_name",
+        time_col="datetime",
+        id_col="industry_id",
+        value_col="pred_value",
+    )
+
+    # =========================处理真实数据=========================
+    hydl_r_raw_df = pd.read_pickle(Path(args.dataset_path).parent.parent.joinpath("行业电量/hydl_r_raw_df.pkl"))
+    # 保存行业电量日数据
+    hydl_r_df = hydl_r_raw_df[["sfmc", "order_no", "hyflmc", "sjsj", "dl"]].copy()
+    hydl_r_df.query('sjsj >= "2020-01-01" and order_no <= 10', inplace=True)
+    hydl_r_df.insert(
+        hydl_r_df.columns.get_loc("order_no"),
+        "hyflid",
+        "[" + hydl_r_df["order_no"].astype("int").astype("str") + "]" + hydl_r_df["hyflmc"],
+    )
+
+    hydl_r_qw_df = hydl_r_df.query('sfmc == "全网"')
+    hydl_r_qw_df['sfmc'] = '全网（汇总）'
+    hydl_r_qsh_df = hydl_r_df.query('hyflid == "[1]全社会用电总计"')
+    hydl_r_qsh_df['hyflid'] = '[1]全社会用电总计（汇总）'
+
+    hydl_r_df = pd.concat([hydl_r_df, hydl_r_qw_df, hydl_r_qsh_df], axis=0)
+    hydl_date_df, hydl_month_df, hydl_date_pvt, hydl_month_pvt = post_processing(
+        hydl_r_df,
+        space_col="sfmc",
+        time_col="sjsj",
+        id_col="hyflid",
+        value_col="dl",
+    )
+
+    # =========================生成对比结果=========================
+    contrast_date_df = pd.merge(date_df, hydl_date_df, on=['province_name', 'order_no', 'industry_id', 'year', 'month', 'date'], how='inner', suffixes=('_pred', '_true'))
+    contrast_month_df = pd.merge(month_df, hydl_month_df, on=['province_name', 'order_no', 'industry_id', 'year', 'month'], how='inner', suffixes=('_pred', '_true'))
+    contrast_date_pvt = pd.merge(date_pvt, hydl_date_pvt, on=['order_no', 'industry_id', 'year', 'month', 'date'], how='inner', suffixes=('_pred', '_true'))
+    contrast_month_pvt = pd.merge(month_pvt, hydl_month_pvt, on=['order_no', 'industry_id', 'year', 'month'], how='inner', suffixes=('_pred', '_true'))
+
+    # =========================再加上一个气温值，方便核查原因=========================
+    # 加载天气数据
+    tq_r_df = pd.read_pickle(Path(args.dataset_path).parent.parent.joinpath("天气/sf_tq_r_df.pkl"))
+    tq_r_df.query('sjsj >= "2020-01-01"', inplace=True)
+
+    tqyb_r_df = pd.read_pickle(Path(args.dataset_path).parent.parent.joinpath("天气预报/sf_tqyb_r_df.pkl"))
+    max_date = tq_r_df.sjsj.max()
+    tq_cols = tq_r_df.columns.to_list()
+    tqyb_r_df = tqyb_r_df[tqyb_r_df.sjsj > max_date][tq_cols]
+    tq_r_df = pd.concat([tq_r_df, tqyb_r_df])
+
+    tq_r_df.rename(columns={"sfmc": "province_name", "sjsj": "date"}, inplace=True)
+    tq_r_df.sort_values(by=["province_name", "date"], ascending=True, inplace=True)
+    contrast_date_df = pd.merge(contrast_date_df, tq_r_df, on=['province_name', 'date'], how='inner')
+
+    # =========================保存结果=========================
+    output_dp = (
+        Path(args.dataset_path) / f"predict_results_{args.pred_start}_{args.pred_start}"
+    )
+
+    if not output_dp.is_dir():
+        output_dp.mkdir(parents=True)
+
+    date_df.to_excel(output_dp.joinpath("日电量明细表【预测】.xlsx"), index=False)
+    month_df.to_excel(output_dp.joinpath("月电量明细表【预测】.xlsx"), index=False)
+    date_pvt.to_excel(output_dp.joinpath("日电量透视表【预测】.xlsx"), index=False)
+    month_pvt.to_excel(output_dp.joinpath("月电量透视表【预测】.xlsx"), index=False)
+
+    hydl_date_df.to_excel(output_dp.joinpath("日电量明细表【真实】.xlsx"), index=False)
+    hydl_month_df.to_excel(output_dp.joinpath("月电量明细表【真实】.xlsx"), index=False)
+    hydl_date_pvt.to_excel(output_dp.joinpath("日电量透视表【真实】.xlsx"), index=False)
+    hydl_month_pvt.to_excel(output_dp.joinpath("月电量透视表【真实】.xlsx"), index=False)
+
+    contrast_date_df.to_excel(output_dp.joinpath("日电量明细表【对比】.xlsx"), index=False)
+    contrast_month_df.to_excel(output_dp.joinpath("月电量明细表【对比】.xlsx"), index=False)
+    contrast_date_pvt.to_excel(output_dp.joinpath("日电量透视表【对比】.xlsx"), index=False)
+    contrast_month_pvt.to_excel(output_dp.joinpath("月电量透视表【对比】.xlsx"), index=False)
+
+

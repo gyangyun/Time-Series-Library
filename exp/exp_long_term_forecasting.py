@@ -235,7 +235,9 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         preds = []
         trues = []
-        folder_path = os.path.join(self.args.root_path, setting, "test_results", "figure")
+        folder_path = os.path.join(
+            self.args.root_path, setting, "test_results", "figure"
+        )
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
@@ -348,7 +350,10 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         f.write("\n")
         f.close()
 
-        np.save(os.path.join(folder_path, "metrics.npy"), np.array([mae, mse, rmse, mape, mspe]))
+        np.save(
+            os.path.join(folder_path, "metrics.npy"),
+            np.array([mae, mse, rmse, mape, mspe]),
+        )
         np.save(os.path.join(folder_path, "pred.npy"), preds)
         np.save(os.path.join(folder_path, "true.npy"), trues)
 
@@ -437,17 +442,31 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                             )
 
                     f_dim = -1 if self.args.features == "MS" else 0
-                    # 取出本次预测的所有步长，因为是逐条数据预测，所以第一维只有1
+                    # 取出本次预测的所有步长，因为是逐条数据预测，所以其实第一维是1
                     current_outputs = current_outputs[:, -self.args.pred_len :, f_dim:]
 
-                    # 将未逆标准化的预测结果更新到all_batch_x中以用于下一时间步的预测，以及all_batch_y中的enc_input部分
-                    # 注意：这里只取了下一个时间步长的预测结果，因为pred_len不一定等于1
+                    # 将未逆标准化的预测结果更新到all_batch_x中的下一时间步及所有之后的时间步中，以及all_batch_y中的dec_input的start_token部分
+                    # 注意：这里只取了预测结果中的第一个current_outputs[:, 0, f_dim:]，因为原模型的pred_len不一定等于1
                     # 最后一次预测就不需要更新了，不然会数组读取溢出
-                    if i + 1 < all_batch_x.shape[0]:
-                        all_batch_x[i + 1, -1, f_dim:] = current_outputs[:, :1, f_dim:]
-                        all_batch_y[i + 1, -self.args.pred_len - 1, f_dim:] = (
-                            current_outputs[:, :1, f_dim:]
-                        )
+                    # if i + 1 < all_batch_x.shape[0]:
+                    #     all_batch_x[i + 1, -1, f_dim:] = current_outputs[:, :1, f_dim:]
+                    #     all_batch_y[i + 1, -self.args.pred_len - 1, f_dim:] = (
+                    #         current_outputs[:, :1, f_dim:]
+                    #     )
+
+                    # i表示当前时间步，j表示下一个时间步及所有之后的时间步的遍历索引
+                    for j in range(i + 1, all_batch_x.shape[0]):
+                        # 逐时间步更新all_batch_x，需更新的位置是-(两个时间步之差)即-(j-i)
+                        # 注意：可能出现seq_len<to_pred_len的情况
+                        # 比如要预测未来100个时间步，即all_batch_x.shape[0](to_pred_len=100)，实际seq_len只有14步，即all_batch_y的第二维实际只有seq_len==14步
+                        if -(j - i) >= -all_batch_x.shape[1]:
+                            all_batch_x[j, -(j - i), f_dim:] = current_outputs[:, 0, f_dim:]
+                        # 逐时间步更新all_batch_y，但是注意：可能出现label_len<to_pred_len的情况
+                        # 比如要预测未来100个时间步，即all_batch_x.shape[0](to_pred_len=100)，实际label_len只有14步，pred_len只有1步，all_batch_y的第二维实际只有label_len+pred_len==15步
+                        if -self.args.pred_len - (j - i) >= -all_batch_y.shape[1]:
+                            all_batch_y[j, -self.args.pred_len - (j - i), f_dim:] = (
+                                current_outputs[:, 0, f_dim:]
+                            )
 
                     current_outputs = current_outputs.detach().cpu().numpy()
                     # 将逆标准化的预测结果添加到最终预测结果中
@@ -539,7 +558,9 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             else:
                 preds = preds
 
-        folder_path = os.path.join(self.args.root_path, setting, "predict_results", "data")
+        folder_path = os.path.join(
+            self.args.root_path, setting, "predict_results", "data"
+        )
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 

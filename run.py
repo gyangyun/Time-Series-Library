@@ -345,7 +345,7 @@ def create_parser():
     parser.add_argument(
         "--is_autoregression", type=int, default=0, help="is autoregression flag"
     )
-    parser.add_argument("--cols", type=str, default="", help="columns")
+    parser.add_argument("--cols", type=str, default="", help="Comma-separated list of features")
     return parser
 
 def create_setting(args, ii):
