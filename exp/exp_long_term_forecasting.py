@@ -14,6 +14,8 @@ from utils.augmentation import run_augmentation, run_augmentation_single
 from utils.dtw_metric import accelerated_dtw, dtw
 from utils.metrics import metric
 from utils.tools import EarlyStopping, adjust_learning_rate, visual
+from utils.losses import CustomLoss, asymmetric_mse_loss
+from functools import partial
 
 warnings.filterwarnings("ignore")
 
@@ -38,7 +40,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         return model_optim
 
     def _select_criterion(self):
-        criterion = nn.MSELoss()
+        # criterion = nn.MSELoss()
+        criterion = CustomLoss(partial(asymmetric_mse_loss, alpha=2.5))
         return criterion
 
     def vali(self, vali_data, vali_loader, criterion):

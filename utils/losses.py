@@ -16,10 +16,11 @@
 Loss functions for PyTorch.
 """
 
+import pdb
+
+import numpy as np
 import torch as t
 import torch.nn as nn
-import numpy as np
-import pdb
 
 
 def divide_no_nan(a, b):
@@ -27,8 +28,8 @@ def divide_no_nan(a, b):
     a/b where the resulted NaN or Inf are replaced by 0.
     """
     result = a / b
-    result[result != result] = .0
-    result[result == np.inf] = .0
+    result[result != result] = 0.0
+    result[result == np.inf] = 0.0
     return result
 
 
@@ -36,8 +37,14 @@ class mape_loss(nn.Module):
     def __init__(self):
         super(mape_loss, self).__init__()
 
-    def forward(self, insample: t.Tensor, freq: int,
-                forecast: t.Tensor, target: t.Tensor, mask: t.Tensor) -> t.float:
+    def forward(
+        self,
+        insample: t.Tensor,
+        freq: int,
+        forecast: t.Tensor,
+        target: t.Tensor,
+        mask: t.Tensor,
+    ) -> t.float:
         """
         MAPE loss as defined in: https://en.wikipedia.org/wiki/Mean_absolute_percentage_error
 
@@ -54,8 +61,14 @@ class smape_loss(nn.Module):
     def __init__(self):
         super(smape_loss, self).__init__()
 
-    def forward(self, insample: t.Tensor, freq: int,
-                forecast: t.Tensor, target: t.Tensor, mask: t.Tensor) -> t.float:
+    def forward(
+        self,
+        insample: t.Tensor,
+        freq: int,
+        forecast: t.Tensor,
+        target: t.Tensor,
+        mask: t.Tensor,
+    ) -> t.float:
         """
         sMAPE loss as defined in https://robjhyndman.com/hyndsight/smape/ (Makridakis 1993)
 
@@ -64,16 +77,26 @@ class smape_loss(nn.Module):
         :param mask: 0/1 mask. Shape: batch, time
         :return: Loss value
         """
-        return 200 * t.mean(divide_no_nan(t.abs(forecast - target),
-                                          t.abs(forecast.data) + t.abs(target.data)) * mask)
+        return 200 * t.mean(
+            divide_no_nan(
+                t.abs(forecast - target), t.abs(forecast.data) + t.abs(target.data)
+            )
+            * mask
+        )
 
 
 class mase_loss(nn.Module):
     def __init__(self):
         super(mase_loss, self).__init__()
 
-    def forward(self, insample: t.Tensor, freq: int,
-                forecast: t.Tensor, target: t.Tensor, mask: t.Tensor) -> t.float:
+    def forward(
+        self,
+        insample: t.Tensor,
+        freq: int,
+        forecast: t.Tensor,
+        target: t.Tensor,
+        mask: t.Tensor,
+    ) -> t.float:
         """
         MASE loss as defined in "Scaled Errors" https://robjhyndman.com/papers/mase.pdf
 
@@ -87,3 +110,89 @@ class mase_loss(nn.Module):
         masep = t.mean(t.abs(insample[:, freq:] - insample[:, :-freq]), dim=1)
         masked_masep_inv = divide_no_nan(mask, masep[:, None])
         return t.mean(t.abs(target - forecast) * masked_masep_inv)
+
+
+def weighted_mse_loss(y_true, y_pred, weights):
+    # y_true, y_pred, weights 应该是形状相同的张量
+    loss = t.mean(weights * (y_true - y_pred) ** 2)
+    return loss
+
+
+def msle_loss(y_true, y_pred):
+    log_true = t.log(y_true + 1)
+    log_pred = t.log(y_pred + 1)
+    loss = t.mean((log_true - log_pred) ** 2)
+    return loss
+
+
+def huber_loss(y_true, y_pred, delta=1.0):
+    error = y_true - y_pred
+    abs_error = t.abs(error)
+    quadratic = t.clamp(abs_error, max=delta)
+    linear = abs_error - quadratic
+    loss = 0.5 * quadratic**2 + delta * linear
+    return t.mean(loss)
+
+
+def quantile_loss(y_true, y_pred, tau=0.5):
+    error = y_true - y_pred
+    # 根据误差的符号决定损失的权重
+    loss = t.mean((tau - (error < 0).float()) * error)
+    return loss
+
+
+def asymmetric_mse_loss(y_true, y_pred, alpha=0.7):
+    """
+    不对称均方误差损失，其中低估部分的惩罚更大。
+
+    :param y_true: 真实值张量。
+    :param y_pred: 预测值张量。
+    :param alpha: 低估惩罚的权重（alpha > 0.5 会鼓励更高的预测）。
+    :return: 损失值。
+    """
+    error = y_true - y_pred
+    squared_error = error**2
+    underestimation_penalty = t.where(error < 0, squared_error * alpha, squared_error)
+    loss = t.mean(underestimation_penalty)
+    return loss
+
+
+def exponential_underestimation_penalty(y_true, y_pred, beta=2.0):
+    """
+    对低估的预测值施加指数级别的惩罚。
+
+    :param y_true: 真实值张量。
+    :param y_pred: 预测值张量。
+    :param beta: 低估惩罚的指数因子。
+    :return: 损失值。
+    """
+    error = y_true - y_pred
+    underestimation_penalty = t.where(error < 0, t.exp(beta * error), error**2)
+    loss = t.mean(underestimation_penalty)
+    return loss
+
+
+def combined_mse_quantile_loss(y_true, y_pred, tau=0.7, mse_weight=0.5):
+    """
+    组合MSE和分位数损失，强调低估部分。
+
+    :param y_true: 真实值张量。
+    :param y_pred: 预测值张量。
+    :param tau: 分位数参数（tau > 0.5 强调低估）。
+    :param mse_weight: MSE部分的权重。
+    :return: 损失值。
+    """
+    mse_loss = t.mean((y_true - y_pred) ** 2)
+    quantile_error = y_true - y_pred
+    quantile_loss = t.mean((tau - (quantile_error < 0).float()) * quantile_error)
+    loss = mse_weight * mse_loss + (1 - mse_weight) * quantile_loss
+
+
+class CustomLoss(nn.Module):
+    def __init__(self, loss_func):
+        super(CustomLoss, self).__init__()
+        self.loss_func = loss_func
+
+    def forward(self, y_pred, y_true):
+        # 调用传入的损失计算函数
+        return self.loss_func(y_pred, y_true)

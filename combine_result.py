@@ -225,6 +225,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # 合并预测结果
     date_df = load_and_concatenate_results(args, is_merge_qsh=True, is_merge_qw=True)
+    # date_df = load_and_concatenate_results(args, is_merge_qsh=False, is_merge_qw=False)
     # =========================处理预测数据=========================
     date_df, month_df, date_pvt, month_pvt = post_processing(
         date_df,
@@ -288,19 +289,17 @@ if __name__ == "__main__":
     if not output_dp.is_dir():
         output_dp.mkdir(parents=True)
 
-    date_df.to_excel(output_dp.joinpath("日电量明细表【预测】.xlsx"), index=False)
-    month_df.to_excel(output_dp.joinpath("月电量明细表【预测】.xlsx"), index=False)
-    date_pvt.to_excel(output_dp.joinpath("日电量透视表【预测】.xlsx"), index=False)
-    month_pvt.to_excel(output_dp.joinpath("月电量透视表【预测】.xlsx"), index=False)
-
-    hydl_date_df.to_excel(output_dp.joinpath("日电量明细表【真实】.xlsx"), index=False)
-    hydl_month_df.to_excel(output_dp.joinpath("月电量明细表【真实】.xlsx"), index=False)
-    hydl_date_pvt.to_excel(output_dp.joinpath("日电量透视表【真实】.xlsx"), index=False)
-    hydl_month_pvt.to_excel(output_dp.joinpath("月电量透视表【真实】.xlsx"), index=False)
+    # date_df.to_excel(output_dp.joinpath("日电量明细表【预测】.xlsx"), index=False)
+    # month_df.to_excel(output_dp.joinpath("月电量明细表【预测】.xlsx"), index=False)
+    # date_pvt.to_excel(output_dp.joinpath("日电量透视表【预测】.xlsx"), index=False)
+    # month_pvt.to_excel(output_dp.joinpath("月电量透视表【预测】.xlsx"), index=False)
+    #
+    # hydl_date_df.to_excel(output_dp.joinpath("日电量明细表【真实】.xlsx"), index=False)
+    # hydl_month_df.to_excel(output_dp.joinpath("月电量明细表【真实】.xlsx"), index=False)
+    # hydl_date_pvt.to_excel(output_dp.joinpath("日电量透视表【真实】.xlsx"), index=False)
+    # hydl_month_pvt.to_excel(output_dp.joinpath("月电量透视表【真实】.xlsx"), index=False)
 
     contrast_date_df.to_excel(output_dp.joinpath("日电量明细表【对比】.xlsx"), index=False)
     contrast_month_df.to_excel(output_dp.joinpath("月电量明细表【对比】.xlsx"), index=False)
-    contrast_date_pvt.to_excel(output_dp.joinpath("日电量透视表【对比】.xlsx"), index=False)
-    contrast_month_pvt.to_excel(output_dp.joinpath("月电量透视表【对比】.xlsx"), index=False)
-
-
+    # contrast_date_pvt.to_excel(output_dp.joinpath("日电量透视表【对比】.xlsx"), index=False)
+    # contrast_month_pvt.to_excel(output_dp.joinpath("月电量透视表【对比】.xlsx"), index=False)

@@ -10,7 +10,8 @@ model_name="TimesNet"
 
 data_name="IEd1"
 features="MS"
-seq_len=14
+# seq_len=14
+seq_len=28
 label_len=7
 pred_len=1
 e_layers=4
@@ -89,6 +90,7 @@ province_names=("广东" "广西" "云南" "贵州" "海南")
 # province_names=("广东")
 industry_ids=("[1]全社会用电总计" "[2]A、全行业用电合计" "[3]第一产业" "[4]第二产业" "[5]第三产业" "[6]B、城乡居民生活用电合计" "[7]城镇居民" "[8]乡村居民" "[9]C、趸售" "[10]D、其他、无行业分类")
 # industry_ids=("[1]全社会用电总计")
+# industry_ids=("[4]第二产业")
 # industry_ids=("[6]B、城乡居民生活用电合计")
 
 dataset_path="/home/guoyy/Workspace/ts/lib/ElecForcastPrep/cache/dataset/deep_learning"
@@ -98,6 +100,7 @@ dataset_path="/home/guoyy/Workspace/ts/lib/ElecForcastPrep/cache/dataset/deep_le
 for province_name in "${province_names[@]}"; do
     for industry_id in "${industry_ids[@]}"; do
         root_path="${dataset_path}/${province_name}/${industry_id}"
+        checkpoints="${root_path}"
 
         # 在这里进行你需要的操作，例如打印路径
         echo "处理路径: ${root_path}"
@@ -114,6 +117,7 @@ for province_name in "${province_names[@]}"; do
         # --model $model_name \
         # --data $data_name \
         # --features $features \
+        # --checkpoints $checkpoints \
         # --seq_len $seq_len \
         # --label_len $label_len \
         # --pred_len $pred_len \
@@ -151,6 +155,7 @@ for province_name in "${province_names[@]}"; do
         # --model $model_name \
         # --data $data_name \
         # --features $features \
+        # --checkpoints $checkpoints \
         # --seq_len $seq_len \
         # --label_len $label_len \
         # --pred_len $pred_len \
@@ -178,10 +183,11 @@ for province_name in "${province_names[@]}"; do
 
         # =========================predict=========================
         is_training=2
-
         data_path="predict_dataset.pkl"
         pred_start="2024-07-01"
         pred_end="2024-07-31"
+        # pred_start="2024-06-01"
+        # pred_end="2024-06-30"
         is_autoregression=1
 
         python -u run.py \
@@ -193,6 +199,7 @@ for province_name in "${province_names[@]}"; do
         --model $model_name \
         --data $data_name \
         --features $features \
+        --checkpoints $checkpoints \
         --seq_len $seq_len \
         --label_len $label_len \
         --pred_len $pred_len \
@@ -225,10 +232,6 @@ for province_name in "${province_names[@]}"; do
 done
 
 # =========================合并结果=========================
-
-pred_start="2024-07-01"
-pred_end="2024-07-31"
-is_training=2
 
 python -u combine_result.py \
 --task_name $task_name \
