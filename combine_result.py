@@ -283,7 +283,7 @@ if __name__ == "__main__":
 
     # =========================保存结果=========================
     output_dp = (
-        Path(args.dataset_path) / f"predict_results_{args.pred_start}_{args.pred_start}"
+        Path(args.dataset_path) / f"predict_results_{args.pred_start}_{args.pred_end}"
     )
 
     if not output_dp.is_dir():

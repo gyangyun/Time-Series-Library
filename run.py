@@ -11,8 +11,9 @@ from exp.exp_classification import Exp_Classification
 from exp.exp_imputation import Exp_Imputation
 from exp.exp_long_term_forecasting import Exp_Long_Term_Forecast
 from exp.exp_short_term_forecasting import Exp_Short_Term_Forecast
-from utils.plot_result import plot_test_result, plot_predict_result
+from utils.plot_result import plot_predict_result, plot_test_result
 from utils.print_args import print_args
+
 
 def create_parser():
     parser = argparse.ArgumentParser(description="TimesNet")
@@ -345,8 +346,11 @@ def create_parser():
     parser.add_argument(
         "--is_autoregression", type=int, default=0, help="is autoregression flag"
     )
-    parser.add_argument("--cols", type=str, default="", help="Comma-separated list of features")
+    parser.add_argument(
+        "--cols", type=str, default="", help="Comma-separated list of features"
+    )
     return parser
+
 
 def create_setting(args, ii):
     """根据提供的 args 参数创建 setting 字符串"""
@@ -373,6 +377,38 @@ def create_setting(args, ii):
         ii,
     )
     return setting
+
+
+def parse_setting(setting):
+    """根据提供的 setting 字符串逆向解析成一个包含参数的 dict"""
+    parts = setting.split("_")
+
+    # 依次对应 create_setting 中各个字段的名称
+    args_dict = {
+        "task_name": parts[0],
+        "model_id": parts[1],
+        "model": parts[2],
+        "data": parts[3],
+        "features": parts[4],
+        "seq_len": int(parts[5]),
+        "label_len": int(parts[6]),
+        "pred_len": int(parts[7]),
+        "d_model": int(parts[8]),
+        "n_heads": int(parts[9]),
+        "e_layers": int(parts[10]),
+        "d_layers": int(parts[11]),
+        "d_ff": int(parts[12]),
+        "expand": int(parts[13]),
+        "d_conv": int(parts[14]),
+        "factor": int(parts[15]),
+        "embed": parts[16],
+        "distil": parts[17] == "True",  # 将字符串 'True'/'False' 转换为布尔类型
+        "des": parts[18],
+        "ii": int(parts[19]),
+    }
+
+    return args_dict
+
 
 if __name__ == "__main__":
     fix_seed = 2021
@@ -434,7 +470,9 @@ if __name__ == "__main__":
         exp.test(setting, load=True)
 
         # 新增代码，用于绘制test结果
-        scaler_y = joblib.load(os.path.join(args.root_path, "preprocessor.bin"))["scaler_y"]
+        scaler_y = joblib.load(os.path.join(args.root_path, "preprocessor.bin"))[
+            "scaler_y"
+        ]
         result_path = os.path.join(args.root_path, setting, "test_results", "data")
         fig_path = os.path.join(args.root_path, setting, "test_results", "figure")
         plot_test_result(
@@ -457,7 +495,9 @@ if __name__ == "__main__":
         torch.cuda.empty_cache()
 
         # 新增代码，用于绘制test结果
-        scaler_y = joblib.load(os.path.join(args.root_path, "preprocessor.bin"))["scaler_y"]
+        scaler_y = joblib.load(os.path.join(args.root_path, "preprocessor.bin"))[
+            "scaler_y"
+        ]
         result_path = os.path.join(args.root_path, setting, "predict_results", "data")
         fig_path = os.path.join(args.root_path, setting, "predict_results", "figure")
         plot_predict_result(

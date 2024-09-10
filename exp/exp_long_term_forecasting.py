@@ -1,6 +1,9 @@
+import csv
 import os
 import time
 import warnings
+from datetime import datetime
+from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -12,10 +15,9 @@ from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
 from utils.augmentation import run_augmentation, run_augmentation_single
 from utils.dtw_metric import accelerated_dtw, dtw
+from utils.losses import CustomLoss, asymmetric_mse_loss
 from utils.metrics import metric
 from utils.tools import EarlyStopping, adjust_learning_rate, visual
-from utils.losses import CustomLoss, asymmetric_mse_loss
-from functools import partial
 
 warnings.filterwarnings("ignore")
 
@@ -344,14 +346,50 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         else:
             dtw = -999
 
-        mae, mse, rmse, mape, mspe = metric(preds, trues)
+        # 记录各项评测指标到csv文件
+        mae, mse, rmse, mape, mspe, smape, r2 = metric(preds, trues)
+        # 打印主要结果
         print("mse:{}, mae:{}, dtw:{}".format(mse, mae, dtw))
-        f = open("result_long_term_forecast.txt", "a")
-        f.write(setting + "  \n")
-        f.write("mse:{}, mae:{}, dtw:{}".format(mse, mae, dtw))
-        f.write("\n")
-        f.write("\n")
-        f.close()
+        # 获取当前时间
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # 文件路径
+        file_path = os.path.join(self.args.root_path, "result_long_term_forecast.csv")
+        # 检查文件是否存在，如果不存在则创建并写入表头
+        file_exists = os.path.isfile(file_path)
+        # 打开CSV文件，准备写入数据
+        with open(file_path, "a", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+
+            # 如果文件不存在，先写入表头
+            if not file_exists:
+                writer.writerow(
+                    [
+                        "setting",
+                        "mae",
+                        "mse",
+                        "rmse",
+                        "mape",
+                        "mspe",
+                        "smape",
+                        "r2",
+                        "dtw",
+                        "timestamp",
+            ]
+        )
+
+            # 写入数据，包含各个评价指标和当前时间
+            writer.writerow(
+                [setting, mae, mse, rmse, mape, mspe, smape, r2, dtw, current_time]
+            )
+
+        # mae, mse, rmse, mape, mspe = metric(preds, trues)
+        # print("mse:{}, mae:{}, dtw:{}".format(mse, mae, dtw))
+        # f = open("result_long_term_forecast.txt", "a")
+        # f.write(setting + "  \n")
+        # f.write("mse:{}, mae:{}, dtw:{}".format(mse, mae, dtw))
+        # f.write("\n")
+        # f.write("\n")
+        # f.close()
 
         np.save(
             os.path.join(folder_path, "metrics.npy"),
@@ -463,7 +501,9 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         # 注意：可能出现seq_len<to_pred_len的情况
                         # 比如要预测未来100个时间步，即all_batch_x.shape[0](to_pred_len=100)，实际seq_len只有14步，即all_batch_y的第二维实际只有seq_len==14步
                         if -(j - i) >= -all_batch_x.shape[1]:
-                            all_batch_x[j, -(j - i), f_dim:] = current_outputs[:, 0, f_dim:]
+                            all_batch_x[j, -(j - i), f_dim:] = current_outputs[
+                                :, 0, f_dim:
+                            ]
                         # 逐时间步更新all_batch_y，但是注意：可能出现label_len<to_pred_len的情况
                         # 比如要预测未来100个时间步，即all_batch_x.shape[0](to_pred_len=100)，实际label_len只有14步，pred_len只有1步，all_batch_y的第二维实际只有label_len+pred_len==15步
                         if -self.args.pred_len - (j - i) >= -all_batch_y.shape[1]:

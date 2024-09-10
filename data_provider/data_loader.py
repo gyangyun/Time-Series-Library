@@ -1168,6 +1168,16 @@ class Dataset_IE_day(Dataset):
         seq_x_mark = self.data_stamp[s_begin:s_end]
         seq_y_mark = self.data_stamp[r_begin:r_end]
 
+        # # 获取需要复制的值
+        # values_to_append_x = seq_x[-1, -5:-2]
+        # # 在seq_x的末尾新增三列，并填充相同的值
+        # seq_x = np.hstack((np.tile(values_to_append_x, (seq_x.shape[0], 1)), seq_x))
+        #
+        # # 获取需要复制的值
+        # values_to_append_y = seq_y[-self.pred_len, -5:-2]
+        # # 在seq_y的末尾新增三列，并填充相同的值
+        # seq_y = np.hstack((np.tile(values_to_append_y, (seq_y.shape[0], 1)), seq_y))
+        #
         return seq_x, seq_y, seq_x_mark, seq_y_mark
 
     def __len__(self):
