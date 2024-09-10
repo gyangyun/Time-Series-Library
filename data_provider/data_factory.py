@@ -25,7 +25,7 @@ def data_provider(args, flag):
     timeenc = 0 if args.embed != 'timeF' else 1
 
     # 如果是验证任务或者预测任务就不需要shuffle
-    shuffle_flag = False if flag in ('test', 'pred') else True
+    shuffle_flag = False if flag in ('test', 'TEST', 'pred', 'PRED') else True
     drop_last = False
     batch_size = args.batch_size
     freq = args.freq

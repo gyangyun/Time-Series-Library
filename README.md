@@ -5,7 +5,7 @@ We provide a neat code base to evaluate advanced deep time series models or deve
 
 :triangular_flag_on_post:**News** (2024.07) We wrote a comprehensive survey of [[Deep Time Series Models]](https://arxiv.org/abs/2407.13278) with a rigorous benchmark based on TSLib. In this paper, we summarized the design principles of current time series models supported by insightful experiments, hoping to be helpful to future research.
 
-:triangular_flag_on_post:**News** (2024.04) Many thanks for the great work from [frecklebars](https://github.com/thuml/Time-Series-Library/pull/378). The famous sequenctial model [Mamba](https://arxiv.org/abs/2312.00752) has been included in our library. See [this file](https://github.com/thuml/Time-Series-Library/blob/main/models/Mamba.py), where you need to install `mamba_ssm` with pip at first.
+:triangular_flag_on_post:**News** (2024.04) Many thanks for the great work from [frecklebars](https://github.com/thuml/Time-Series-Library/pull/378). The famous sequential model [Mamba](https://arxiv.org/abs/2312.00752) has been included in our library. See [this file](https://github.com/thuml/Time-Series-Library/blob/main/models/Mamba.py), where you need to install `mamba_ssm` with pip at first.
 
 :triangular_flag_on_post:**News** (2024.03) Given the inconsistent look-back length of various papers, we split the long-term forecasting in the leaderboard into two categories: Look-Back-96 and Look-Back-Searching. We recommend researchers read [TimeMixer](https://openreview.net/pdf?id=7oLshfEIC2), which includes both look-back length settings in experiments for scientific rigor.
 
@@ -93,7 +93,11 @@ bash ./scripts/classification/TimesNet.sh
 - Include the newly added model in the `Exp_Basic.model_dict` of  `./exp/exp_basic.py`.
 - Create the corresponding scripts under the folder `./scripts`.
 
-Note: The original code for the classification task can be found [here](https://github.com/thuml/Flowformer/tree/main/Flowformer_TimeSeries). It is hard to fuse all five tasks in one library. We are still working on this task.
+Note: 
+
+(1) About classification: Since we include all five tasks in a unified code base, the accuracy of each subtask may fluctuate but the average performance can be reproduced (even a bit better). We have provided the reproduced checkpoints [here](https://github.com/thuml/Time-Series-Library/issues/494).
+
+(2) About anomaly detection: Some discussion about the adjustment strategy in anomaly detection can be found [here](https://github.com/thuml/Anomaly-Transformer/issues/14). The key point is that the adjustment strategy corresponds to an event-level metric.
 
 ## Citation
 
@@ -118,13 +122,16 @@ If you find this repo useful, please cite our paper.
 ## Contact
 If you have any questions or suggestions, feel free to contact our maintenance team:
 
+Current:
 - Haixu Wu (Ph.D. student, wuhx23@mails.tsinghua.edu.cn)
 - Yong Liu (Ph.D. student, liuyong21@mails.tsinghua.edu.cn)
 - Yuxuan Wang (Ph.D. student, wangyuxu22@mails.tsinghua.edu.cn)
+- Huikun Weng (Undergraduate, wenghk22@mails.tsinghua.edu.cn)
+
+Previous:
 - Tengge Hu (Master student, htg21@mails.tsinghua.edu.cn)
 - Haoran Zhang (Master student, z-hr20@mails.tsinghua.edu.cn)
 - Jiawei Guo (Undergraduate, guo-jw21@mails.tsinghua.edu.cn)
-- Huikun Weng (Undergraduate, wenghk22@mails.tsinghua.edu.cn)
 
 Or describe it in Issues.
 
