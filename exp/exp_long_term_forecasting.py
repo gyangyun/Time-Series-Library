@@ -120,6 +120,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         if self.args.use_amp:
             scaler = torch.cuda.amp.GradScaler()
 
+        best_vali_loss = float("inf")
         for epoch in range(self.args.train_epochs):
             iter_count = 0
             train_loss = []
@@ -215,6 +216,11 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     epoch + 1, train_steps, train_loss, vali_loss, test_loss
                 )
             )
+
+            # 每个epoch都更新最佳验证损失，以便使用超参搜索时作为优化目标
+            if vali_loss < best_vali_loss:
+                best_vali_loss = vali_loss
+
             early_stopping(vali_loss, self.model, path)
             if early_stopping.early_stop:
                 print("Early stopping")
@@ -225,7 +231,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         best_model_path = path + "/" + "checkpoint.pth"
         self.model.load_state_dict(torch.load(best_model_path))
 
-        return self.model
+        return self.model, best_vali_loss
 
     def test(self, setting, load=False):
         test_data, test_loader = self._get_data(flag="test")
@@ -308,16 +314,17 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
                 preds.append(pred)
                 trues.append(true)
-                if i % 20 == 0:
-                    input = batch_x.detach().cpu().numpy()
-                    if test_data.scale and self.args.inverse:
-                        shape = input.shape
-                        input = test_data.inverse_transform(
-                            input.reshape(shape[0] * shape[1], -1)
-                        ).reshape(shape)
-                    gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
-                    pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
-                    visual(gt, pd, os.path.join(folder_path, str(i) + ".pdf"))
+                # 不需要绘制了
+                # if i % 20 == 0:
+                #     input = batch_x.detach().cpu().numpy()
+                #     if test_data.scale and self.args.inverse:
+                #         shape = input.shape
+                #         input = test_data.inverse_transform(
+                #             input.reshape(shape[0] * shape[1], -1)
+                #         ).reshape(shape)
+                #     gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
+                #     pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
+                #     visual(gt, pd, os.path.join(folder_path, str(i) + ".pdf"))
 
         preds = np.concatenate(preds, axis=0)
         trues = np.concatenate(trues, axis=0)
@@ -374,8 +381,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         "r2",
                         "dtw",
                         "timestamp",
-            ]
-        )
+                    ]
+                )
 
             # 写入数据，包含各个评价指标和当前时间
             writer.writerow(
@@ -398,7 +405,20 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         np.save(os.path.join(folder_path, "pred.npy"), preds)
         np.save(os.path.join(folder_path, "true.npy"), trues)
 
-        return
+        # 将评测结果封装到字典中
+        evaluation_results = {
+            "mae": mae,
+            "mse": mse,
+            "rmse": rmse,
+            "mape": mape,
+            "mspe": mspe,
+            "smape": smape,
+            "r2": r2,
+            "dtw": dtw,
+        }
+
+        # 返回评测结果字典
+        return evaluation_results
 
     def predict(self, setting, load=True):
         pred_data, pred_loader = self._get_data(flag="pred")
@@ -416,7 +436,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         self.model.eval()
         with torch.no_grad():
-            if self.args.is_autoregression:
+            if self.args.use_autoregression:
                 all_batch_x, all_batch_y, all_batch_x_mark, all_batch_y_mark = (
                     [],
                     [],
@@ -488,13 +508,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
                     # 将未逆标准化的预测结果更新到all_batch_x中的下一时间步及所有之后的时间步中，以及all_batch_y中的dec_input的start_token部分
                     # 注意：这里只取了预测结果中的第一个current_outputs[:, 0, f_dim:]，因为原模型的pred_len不一定等于1
-                    # 最后一次预测就不需要更新了，不然会数组读取溢出
-                    # if i + 1 < all_batch_x.shape[0]:
-                    #     all_batch_x[i + 1, -1, f_dim:] = current_outputs[:, :1, f_dim:]
-                    #     all_batch_y[i + 1, -self.args.pred_len - 1, f_dim:] = (
-                    #         current_outputs[:, :1, f_dim:]
-                    #     )
-
                     # i表示当前时间步，j表示下一个时间步及所有之后的时间步的遍历索引
                     for j in range(i + 1, all_batch_x.shape[0]):
                         # 逐时间步更新all_batch_x，需更新的位置是-(两个时间步之差)即-(j-i)
@@ -581,7 +594,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
 
         # 预测结果后处理
-        if self.args.is_autoregression:
+        if self.args.use_autoregression:
             # 使用自回归的preds的尺寸为：[待预测时间步长, pred_len, output_size]
             # 将其转换成一条预测结果：[1, 待预测时间步长, output_size]
             preds = preds[:, 0, :]
@@ -609,4 +622,4 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         np.save(os.path.join(folder_path, "real_prediction.npy"), preds)
 
-        return
+        return preds

@@ -1065,7 +1065,7 @@ class Dataset_IE_day(Dataset):
                 pred_end_date = pd.to_datetime(self.args.pred_end)
 
             # 如果不使用自回归
-            if not self.args.is_autoregression:
+            if not self.args.use_autoregression:
                 # 校验待预测的时间长度和模型能够预测的时间长度
                 to_pred_len = (pred_end_date - pred_start_date).days + 1
                 if to_pred_len > self.pred_len:
@@ -1168,16 +1168,16 @@ class Dataset_IE_day(Dataset):
         seq_x_mark = self.data_stamp[s_begin:s_end]
         seq_y_mark = self.data_stamp[r_begin:r_end]
 
-        # # 获取需要复制的值
-        # values_to_append_x = seq_x[-1, -5:-2]
-        # # 在seq_x的末尾新增三列，并填充相同的值
-        # seq_x = np.hstack((np.tile(values_to_append_x, (seq_x.shape[0], 1)), seq_x))
-        #
-        # # 获取需要复制的值
-        # values_to_append_y = seq_y[-self.pred_len, -5:-2]
-        # # 在seq_y的末尾新增三列，并填充相同的值
-        # seq_y = np.hstack((np.tile(values_to_append_y, (seq_y.shape[0], 1)), seq_y))
-        #
+        # 获取需要复制的值
+        values_to_append_x = seq_x[-1, -5:-2]
+        # 在seq_x的末尾新增三列，并填充相同的值
+        seq_x = np.hstack((np.tile(values_to_append_x, (seq_x.shape[0], 1)), seq_x))
+
+        # 获取需要复制的值
+        values_to_append_y = seq_y[-self.pred_len, -5:-2]
+        # 在seq_y的末尾新增三列，并填充相同的值
+        seq_y = np.hstack((np.tile(values_to_append_y, (seq_y.shape[0], 1)), seq_y))
+
         return seq_x, seq_y, seq_x_mark, seq_y_mark
 
     def __len__(self):

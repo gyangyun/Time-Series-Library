@@ -197,7 +197,7 @@ for province_name in "${province_names[@]}"; do
         pred_end="2024-07-31"
         # pred_start="2024-06-01"
         # pred_end="2024-06-30"
-        is_autoregression=1
+        use_autoregression=1
 
         python -u run.py \
         --task_name $task_name \
@@ -238,7 +238,7 @@ for province_name in "${province_names[@]}"; do
         --test_end $test_end \
         --pred_start $pred_start \
         --pred_end $pred_end \
-        --is_autoregression $is_autoregression \
+        --use_autoregression $use_autoregression \
         --cols "${cols[*]}"
 
     done

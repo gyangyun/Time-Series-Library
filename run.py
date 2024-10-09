@@ -1,10 +1,14 @@
+# coding=utf-8
 import argparse
+import json
 import os
 import random
 
 import joblib
 import numpy as np
 import torch
+from ray import train, tune
+from ray.tune.search.optuna import OptunaSearch
 
 from exp.exp_anomaly_detection import Exp_Anomaly_Detection
 from exp.exp_classification import Exp_Classification
@@ -344,10 +348,16 @@ def create_parser():
     # 注意：pred_end表示预测数据集中能预测的边界
     parser.add_argument("--pred_end", type=str, default="", help="pred end")
     parser.add_argument(
-        "--is_autoregression", type=int, default=0, help="is autoregression flag"
+        "--cols", type=str, default="", help="Comma-separated list of features"
     )
     parser.add_argument(
-        "--cols", type=str, default="", help="Comma-separated list of features"
+        "--use_autoregression", type=int, default=0, help="is autoregression flag"
+    )
+    parser.add_argument(
+        "--use_best_params",
+        type=int,
+        default=0,
+        help="是否使用最优参数,0表示不使用,1表示使用"
     )
     return parser
 
@@ -409,8 +419,36 @@ def parse_setting(setting):
 
     return args_dict
 
+def load_best_args(args):
+    """
+    加载最佳参数文件，并更新args中的部分参数
+    """
+    best_args_path = os.path.join(args.root_path, "best_args.json")
+    if os.path.exists(best_args_path):
+        print("发现最佳参数文件，将使用最佳参数")
+        with open(best_args_path, "r") as f:
+            best_args = json.load(f)
+        # 更新args中的部分参数
+        not_update_keys = [
+            "is_training",
+            "train_start",
+            "train_end",
+            "test_start",
+            "test_end",
+            "pred_start",
+            "pred_end",
+            "use_autoregression",
+        ]
+        for key, value in best_args.items():
+            if key not in not_update_keys:
+                setattr(args, key, value)
+        print("已更新参数:", best_args)
+    else:
+        print("未找到最佳参数文件，将使用默认参数")
+    return args
 
-if __name__ == "__main__":
+
+def main():
     fix_seed = 2021
     random.seed(fix_seed)
     torch.manual_seed(fix_seed)
@@ -445,6 +483,7 @@ if __name__ == "__main__":
     else:
         Exp = Exp_Long_Term_Forecast
 
+    # 训练
     if args.is_training == 1:
         for ii in range(args.itr):
             # setting record of experiments
@@ -461,7 +500,11 @@ if __name__ == "__main__":
             )
             exp.test(setting)
             torch.cuda.empty_cache()
+    # 测试
     elif args.is_training == 0:
+        if args.use_best_params == 1:
+            args = load_best_args(args)
+
         ii = 0
         setting = create_setting(args, ii)
 
@@ -485,7 +528,11 @@ if __name__ == "__main__":
         )
 
         torch.cuda.empty_cache()
-    else:
+    # 预测
+    elif args.is_training == 2:
+        if args.use_best_params == 1:
+            args = load_best_args(args)
+
         ii = 0
         setting = create_setting(args, ii)
 
@@ -508,3 +555,87 @@ if __name__ == "__main__":
             args.freq,
             scaler_y,
         )
+    # 超参搜索
+    elif args.is_training == 3:
+        print(">>>>>>>开始超参数搜索>>>>>>>>>>>>>>>>>>>>>>>>>>")
+        # 定义超参数搜索空间
+        search_space = {
+            "model": tune.choice(["TimesNet", "Autoformer", "Transformer", "Informer"]),
+            # 可以添加其他超参数
+            # "learning_rate": tune.loguniform(1e-4, 1e-1),
+            # "batch_size": tune.choice([16, 32, 64, 128]),
+            # "n_heads": tune.choice([4, 8, 16]),
+            # "e_layers": tune.randint(4, 8),
+            # "d_layers": tune.randint(2, 6),
+            # "d_model": tune.choice([64, 256, 512, 1024]),
+            # "d_ff": tune.choice([128, 256, 512, 1024]),
+            # "dropout": tune.uniform(0.1, 0.5),
+            # "seq_len": tune.choice([14, 28, 56, 112]),
+            # "label_len": tune.choice([7, 14, 28]),
+            # "factor": tune.choice([1, 3, 5]),
+        }
+
+        # 定义目标函数
+        def objective(config):
+            # 更新参数
+            for key, value in config.items():
+                setattr(args, key, value)
+
+            exp = Exp(args)
+            setting = create_setting(args, 0)
+
+            # 训练模型并获取验证集loss
+            best_model_path, val_loss = exp.train(setting)
+
+            # 报告验证集loss给Ray Tune
+            train.report({"val_loss": val_loss})
+
+        # 设置搜索算法
+        algo = OptunaSearch()
+
+        # 设置Tuner
+        tuner = tune.Tuner(
+            tune.with_resources(
+                objective, resources={"cpu": 2}
+            ),  # 如果使用GPU，可以改为 {"cpu": 1, "gpu": 1}
+            tune_config=tune.TuneConfig(
+                metric="val_loss",
+                mode="min",
+                search_alg=algo,
+                num_samples=3,  # 可以增加样本数量以获得更好的结果
+            ),
+            run_config=train.RunConfig(
+                name="optimized_timesnet_tuning",
+                stop={"training_iteration": args.train_epochs},
+            ),
+            param_space=search_space,
+        )
+
+        # 运行超参数搜索
+        results = tuner.fit()
+
+        # 获取最佳配置
+        best_result = results.get_best_result("val_loss", "min")
+        print("最佳试验的配置: ", best_result.config)
+        print("最佳试验的验证集损失: ", best_result.metrics["val_loss"])
+
+        # 更新args以包含最佳超参数
+        for key, value in best_result.config.items():
+            setattr(args, key, value)
+
+        # 保存最佳参数（args）
+        best_args_path = os.path.join(args.root_path, "best_args.json")
+        with open(best_args_path, "w") as f:
+            json.dump(vars(args), f, indent=4)
+        print(f"最佳参数已保存至: {best_args_path}")
+
+        # 使用最佳参数重新训练模型
+        print("使用最佳参数重新训练模型")
+        exp = Exp(args)
+        setting = create_setting(args, 0)
+        exp.train(setting)
+        torch.cuda.empty_cache()
+
+
+if __name__ == "__main__":
+    main()
