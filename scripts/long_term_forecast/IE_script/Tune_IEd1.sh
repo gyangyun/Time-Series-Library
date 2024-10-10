@@ -42,6 +42,7 @@ train_epochs=30
 batch_size=16
 top_k=5
 description="Exp"
+# model_id="IEd1_${seq_len}_${label_len}_${pred_len}"
 model_id="IEd1_${seq_len}_${label_len}_${pred_len}"
 
 # -------------------------数据集相关参数-------------------------
@@ -109,8 +110,8 @@ cols=(
 # "electricity_consumption"
 
 # =========================实验设置=========================
-province_names=("广东")
-industry_ids=("[6]B、城乡居民生活用电合计")
+# province_names=("广东")
+# industry_ids=("[6]B、城乡居民生活用电合计")
 
 province_names=("广东" "广西" "云南" "贵州" "海南" "广州" "深圳" "广东（含广州）")
 # province_names=("广东（含广州）")
@@ -119,7 +120,7 @@ province_names=("广东" "广西" "云南" "贵州" "海南" "广州" "深圳" "
 # industry_ids=("[1]全社会用电总计" "[2]A、全行业用电合计" "[3]第一产业" "[4]第二产业" "[5]第三产业" "[6]B、城乡居民生活用电合计" "[7]城镇居民" "[8]乡村居民" "[9]C、趸售" "[10]D、其他、无行业分类")
 industry_ids=("[1]全社会用电总计" "[3]第一产业" "[4]第二产业" "[5]第三产业" "[6]B、城乡居民生活用电合计" "[9]C、趸售" "[10]D、其他、无行业分类")
 # industry_ids=("[1]全社会用电总计")
-# industry_ids=("[4]第二产业")
+# industry_ids=("[3]第一产业")
 # industry_ids=("[6]B、城乡居民生活用电合计")
 
 # 遍历所有 province_name 和 industry_id 的组合
@@ -137,9 +138,9 @@ for province_name in "${province_names[@]}"; do
         # use_autoregression=1
         # use_best_params=0
         # =========================test=========================
-        # is_training=0
-        # use_autoregression=0
-        # use_best_params=1
+        is_training=0
+        use_autoregression=0
+        use_best_params=1
         # =========================tune=========================
         # is_training=3
         # use_autoregression=1
@@ -190,49 +191,59 @@ for province_name in "${province_names[@]}"; do
         --test_end $test_end \
         --pred_start $pred_start \
         --pred_end $pred_end \
-        --use_autoregression $use_autoregression \
         --cols "${cols[*]}" \
+        --use_autoregression $use_autoregression \
         --use_best_params $use_best_params
     done
 done
 # =========================合并结果=========================
+is_training=0
 use_autoregression=1
 use_best_params=1
-# python -u combine_result.py \
-# --task_name $task_name \
-# --is_training $is_training \
-# --model_id $model_id \
-# --model $model_name \
-# --data $data_name \
-# --features $features \
-# --seq_len $seq_len \
-# --label_len $label_len \
-# --pred_len $pred_len \
-# --e_layers $e_layers \
-# --d_layers $d_layers \
-# --factor $factor \
-# --enc_in $enc_in \
-# --dec_in $dec_in \
-# --c_out $c_out \
-# --d_model $d_model \
-# --d_ff $d_ff \
-# --down_sampling_layers $down_sampling_layers \
-# --down_sampling_window $down_sampling_window \
-# --down_sampling_method $down_sampling_method \
-# --des $description \
-# --itr $itr \
-# --train_epochs $train_epochs \
-# --batch_size $batch_size \
-# --top_k $top_k \
-# --freq $freq \
-# --target $target \
-# --train_start $train_start \
-# --train_end $train_end \
-# --test_start $test_start \
-# --test_end $test_end \
-# --pred_start $pred_start \
-# --pred_end $pred_end \
-# --cols "${cols[*]}" \
-# --dataset_path $dataset_path \
-# --province_names "${province_names[*]}" \
-# --industry_ids "${industry_ids[*]}"
+root_path="${dataset_path}"
+data_path="${dataset_path}"
+checkpoints="${dataset_path}"
+python -u combine_result.py \
+--task_name $task_name \
+--is_training $is_training \
+--root_path $root_path \
+--data_path $data_path \
+--dataset_path $dataset_path \
+--model_id $model_id \
+--model $model_name \
+--data $data_name \
+--features $features \
+--checkpoints $checkpoints \
+--seq_len $seq_len \
+--label_len $label_len \
+--pred_len $pred_len \
+--n_heads $n_heads \
+--e_layers $e_layers \
+--d_layers $d_layers \
+--factor $factor \
+--enc_in $enc_in \
+--dec_in $dec_in \
+--c_out $c_out \
+--d_model $d_model \
+--d_ff $d_ff \
+--down_sampling_layers $down_sampling_layers \
+--down_sampling_window $down_sampling_window \
+--down_sampling_method $down_sampling_method \
+--des $description \
+--itr $itr \
+--train_epochs $train_epochs \
+--batch_size $batch_size \
+--top_k $top_k \
+--freq $freq \
+--target $target \
+--province_names "${province_names[*]}" \
+--industry_ids "${industry_ids[*]}"  \
+--train_start $train_start \
+--train_end $train_end \
+--test_start $test_start \
+--test_end $test_end \
+--pred_start $pred_start \
+--pred_end $pred_end \
+--cols "${cols[*]}" \
+--use_autoregression $use_autoregression \
+--use_best_params $use_best_params

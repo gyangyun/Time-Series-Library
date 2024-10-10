@@ -430,18 +430,49 @@ def load_best_args(args):
         with open(best_args_path, "r") as f:
             best_args = json.load(f)
         # 更新args中的部分参数
-        not_update_keys = [
-            "is_training",
-            "train_start",
-            "train_end",
-            "test_start",
-            "test_end",
-            "pred_start",
-            "pred_end",
-            "use_autoregression",
+        # not_update_keys = [
+        #     "is_training",
+        #     "province_names",
+        #     "industry_ids",
+        #     "root_path",
+        #     "checkpoints",
+        #     "data_path",
+        #     "train_start",
+        #     "train_end",
+        #     "test_start",
+        #     "test_end",
+        #     "pred_start",
+        #     "pred_end",
+        #     "use_autoregression",
+        # ]
+
+        update_keys = [
+            'task_name',
+            'model_id',
+            'model',
+            'data',
+            'features',
+            'seq_len',
+            'label_len',
+            'pred_len',
+            'd_model',
+            'n_heads',
+            'e_layers',
+            'd_layers',
+            'd_ff',
+            'expand',
+            'd_conv',
+            'factor',
+            'embed',
+            'distil',
+            'des',
+            'ii',
         ]
+
+
         for key, value in best_args.items():
-            if key not in not_update_keys:
+            # if key not in not_update_keys:
+            if key in update_keys:
                 setattr(args, key, value)
         print("已更新参数:", best_args)
     else:
