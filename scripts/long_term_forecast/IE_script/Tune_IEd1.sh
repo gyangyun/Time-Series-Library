@@ -196,7 +196,8 @@ for province_name in "${province_names[@]}"; do
     done
 done
 # =========================合并结果=========================
-
+use_autoregression=1
+use_best_params=1
 # python -u combine_result.py \
 # --task_name $task_name \
 # --is_training $is_training \

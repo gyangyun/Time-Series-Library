@@ -3,8 +3,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-
-from run import create_parser, create_setting
+from run import create_parser, create_setting, load_best_args
 
 
 def merge_df(
@@ -25,7 +24,6 @@ def merge_df(
         return_df = grouped_df[[col for col in df.columns if col in grouped_df.columns]]
 
     return return_df
-
 
 def load_and_concatenate_test_results(args, is_merge_qsh, is_merge_qw):
     dataset_path = args.dataset_path
@@ -53,6 +51,8 @@ def load_and_concatenate_test_results(args, is_merge_qsh, is_merge_qw):
             scaler_y = preprocessor["scaler_y"]
 
             # 生成 setting 变量
+            if args.use_best_params == 1:
+                args = load_best_args(args)
             setting = create_setting(args, ii=0)  # 假设ii=0
 
             results_path = root_path / setting / "test_results" / "data"
@@ -82,18 +82,14 @@ def load_and_concatenate_test_results(args, is_merge_qsh, is_merge_qw):
 
             # 创建一个包含所有预测和真实值的DataFrame
             # 针对单步长输出
-            df = pd.DataFrame(
-                {
-                    "datetime": time_range,
-                    "pred_value": pred.flatten(),
-                    "true_value": true.flatten(),
-                }
-            )
-            df["province_name"] = province_name
-            df["industry_id"] = industry_id
-            df = df[
-                ["province_name", "industry_id", "datetime", "pred_value", "true_value"]
-            ]
+            df = pd.DataFrame({
+                "datetime": time_range,
+                "pred_value": pred.flatten(),
+                "true_value": true.flatten()
+            })
+            df['province_name'] = province_name
+            df['industry_id'] = industry_id
+            df = df[["province_name", "industry_id", "datetime", "pred_value", "true_value"]]
 
             all_results.append(df)
 
@@ -155,7 +151,7 @@ def load_and_concatenate_test_results(args, is_merge_qsh, is_merge_qw):
             is_append=False,
         )
         concatenated_df = pd.concat([concatenated_df, qsh_df], axis=0)
-
+    
     return concatenated_df
 
 
@@ -185,6 +181,8 @@ def load_and_concatenate_pred_results(args, is_merge_qsh, is_merge_qw):
             scaler_y = preprocessor["scaler_y"]
 
             # 生成 setting 变量
+            if args.use_best_params == 1:
+                args = load_best_args(args)
             setting = create_setting(args, ii=0)  # 假设ii=0
 
             results_path = root_path / setting / "predict_results" / "data"
@@ -263,7 +261,10 @@ def load_and_concatenate_pred_results(args, is_merge_qsh, is_merge_qw):
     return concatenated_df
 
 
-def results_post_processing(date_df, values):
+def results_post_processing(
+    date_df,
+    values
+):
     date_df["order_no"] = date_df["industry_id"].str.extract(r"\[(\d+)\]").astype("int")
     date_df["year"] = date_df["date"].dt.year
     date_df["month"] = date_df["date"].dt.month
@@ -277,8 +278,7 @@ def results_post_processing(date_df, values):
             "year",
             "month",
             "date",
-        ]
-        + values
+        ] + values
     ]
     # 月电量明细
     month_df = date_df.groupby(
@@ -306,7 +306,7 @@ def results_post_processing(date_df, values):
     # 日电量透视图
     date_pvt = pd.pivot_table(
         date_df,
-        index=["order_no", "industry_id", "year", "month", "date"],
+        index=["order_no", "industry_id", "year", "month","date"],
         columns="province_name",
         values=values,
         aggfunc="sum",
@@ -342,14 +342,10 @@ if __name__ == "__main__":
 
     # =========================处理预测数据=========================
     # 合并预测结果
-    pred_date_df = load_and_concatenate_pred_results(
-        args, is_merge_qsh=True, is_merge_qw=True
-    )
-    pred_date_df, pred_month_df, pred_date_pvt, pred_month_pvt = (
-        results_post_processing(
-            pred_date_df,
-            values=["pred_value"],
-        )
+    pred_date_df = load_and_concatenate_pred_results(args, is_merge_qsh=True, is_merge_qw=True)
+    pred_date_df, pred_month_df, pred_date_pvt, pred_month_pvt = results_post_processing(
+        pred_date_df,
+        values=["pred_value"],
     )
     # 保存结果
     pred_output_dp = (
@@ -358,29 +354,17 @@ if __name__ == "__main__":
 
     if not pred_output_dp.is_dir():
         pred_output_dp.mkdir(parents=True)
-
-    pred_date_df.to_excel(
-        pred_output_dp.joinpath("日电量明细表【预测】.xlsx"), index=False
-    )
-    pred_month_df.to_excel(
-        pred_output_dp.joinpath("月电量明细表【预测】.xlsx"), index=False
-    )
-    pred_date_pvt.to_excel(
-        pred_output_dp.joinpath("日电量透视表【预测】.xlsx"), index=False
-    )
-    pred_month_pvt.to_excel(
-        pred_output_dp.joinpath("月电量透视表【预测】.xlsx"), index=False
-    )
+    
+    pred_date_df.to_excel(pred_output_dp.joinpath("日电量明细表【预测】.xlsx"), index=False)
+    pred_month_df.to_excel(pred_output_dp.joinpath("月电量明细表【预测】.xlsx"), index=False)
+    pred_date_pvt.to_excel(pred_output_dp.joinpath("日电量透视表【预测】.xlsx"), index=False)
+    pred_month_pvt.to_excel(pred_output_dp.joinpath("月电量透视表【预测】.xlsx"), index=False)
 
     # =========================处理真实数据=========================
-    test_date_df = load_and_concatenate_test_results(
-        args, is_merge_qsh=True, is_merge_qw=True
-    )
-    test_date_df, test_month_df, test_date_pvt, test_month_pvt = (
-        results_post_processing(
-            test_date_df,
-            values=["pred_value", "true_value"],
-        )
+    test_date_df = load_and_concatenate_test_results(args, is_merge_qsh=True, is_merge_qw=True)
+    test_date_df, test_month_df, test_date_pvt, test_month_pvt = results_post_processing(
+        test_date_df,
+        values=['pred_value', 'true_value'],
     )
 
     # 保存结果
@@ -390,19 +374,11 @@ if __name__ == "__main__":
 
     if not test_output_dp.is_dir():
         test_output_dp.mkdir(parents=True)
-
-    test_date_df.to_excel(
-        test_output_dp.joinpath("日电量明细表【测试】.xlsx"), index=False
-    )
-    test_month_df.to_excel(
-        test_output_dp.joinpath("月电量明细表【测试】.xlsx"), index=False
-    )
-    test_date_pvt.to_excel(
-        test_output_dp.joinpath("日电量透视表【测试】.xlsx"), index=False
-    )
-    test_month_pvt.to_excel(
-        test_output_dp.joinpath("月电量透视表【测试】.xlsx"), index=False
-    )
+    
+    test_date_df.to_excel(test_output_dp.joinpath("日电量明细表【测试】.xlsx"), index=False)
+    test_month_df.to_excel(test_output_dp.joinpath("月电量明细表【测试】.xlsx"), index=False)
+    test_date_pvt.to_excel(test_output_dp.joinpath("日电量透视表【测试】.xlsx"), index=False)
+    test_month_pvt.to_excel(test_output_dp.joinpath("月电量透视表【测试】.xlsx"), index=False)
     # =========================处理真实数据=========================
     # hydl_r_raw_df = pd.read_pickle(Path(args.dataset_path).parent.parent.joinpath("行业电量/hydl_r_raw_df.pkl"))
     # # 保存行业电量日数据
