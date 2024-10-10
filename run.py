@@ -9,6 +9,7 @@ import numpy as np
 import torch
 from ray import train, tune
 from ray.tune.search.optuna import OptunaSearch
+from ray.tune.search import grid_search
 
 from exp.exp_anomaly_detection import Exp_Anomaly_Detection
 from exp.exp_classification import Exp_Classification
@@ -560,17 +561,19 @@ def main():
         print(">>>>>>>开始超参数搜索>>>>>>>>>>>>>>>>>>>>>>>>>>")
         # 定义超参数搜索空间
         search_space = {
-            "model": tune.choice(["TimesNet", "Autoformer", "Transformer", "Informer"]),
+            # "model": tune.choice(["TimesNet", "Autoformer", "Transformer", "Informer"]),
+            # "model": tune.choice(["TimesNet", "iTransformer"]),
             # 可以添加其他超参数
             # "learning_rate": tune.loguniform(1e-4, 1e-1),
             # "batch_size": tune.choice([16, 32, 64, 128]),
-            # "n_heads": tune.choice([4, 8, 16]),
+            # "n_heads": tune.choice([8, 16]),
             # "e_layers": tune.randint(4, 8),
             # "d_layers": tune.randint(2, 6),
-            # "d_model": tune.choice([64, 256, 512, 1024]),
+            # "d_model": tune.choice([64, 128, 256, 512, 1024]),
             # "d_ff": tune.choice([128, 256, 512, 1024]),
             # "dropout": tune.uniform(0.1, 0.5),
-            # "seq_len": tune.choice([14, 28, 56, 112]),
+            # "seq_len": tune.choice([14, 28, 56, 84]),
+            "seq_len": grid_search([14, 28, 56, 84]),
             # "label_len": tune.choice([7, 14, 28]),
             # "factor": tune.choice([1, 3, 5]),
         }
@@ -591,18 +594,22 @@ def main():
             train.report({"val_loss": val_loss})
 
         # 设置搜索算法
-        algo = OptunaSearch()
+        # OptunaSearch是随机搜索算法，所以无法使用grid_search
+        # 要使用grid_search请使用tune的默认搜索算法，即不指定search_alg
+        # 而使用grid_search时，num_samples表示重复次数，请勿设置
+        search_alg = OptunaSearch()
 
         # 设置Tuner
         tuner = tune.Tuner(
             tune.with_resources(
-                objective, resources={"cpu": 2}
+                # objective, resources={"cpu": 2}
+                objective, resources={"cpu": 0, "gpu": 0.25}
             ),  # 如果使用GPU，可以改为 {"cpu": 1, "gpu": 1}
             tune_config=tune.TuneConfig(
                 metric="val_loss",
                 mode="min",
-                search_alg=algo,
-                num_samples=3,  # 可以增加样本数量以获得更好的结果
+                # search_alg=search_alg,
+                # num_samples=4,  # 可以增加样本数量以获得更好的结果
             ),
             run_config=train.RunConfig(
                 name="optimized_timesnet_tuning",
