@@ -1,4 +1,3 @@
-# coding=utf-8
 import argparse
 import json
 import os
@@ -29,15 +28,20 @@ def create_parser():
         type=str,
         required=True,
         default="long_term_forecast",
-        help="task name, options:[long_term_forecast, short_term_forecast, imputation, classification, anomaly_detection]",
+        help=
+        "task name, options:[long_term_forecast, short_term_forecast, imputation, classification, anomaly_detection]",
     )
     # 新增一个2模式，表示预测。即{0: 'test', 1: 'train', 2, 'predict'}
-    parser.add_argument(
-        "--is_training", type=int, required=True, default=1, help="status"
-    )
-    parser.add_argument(
-        "--model_id", type=str, required=True, default="test", help="model id"
-    )
+    parser.add_argument("--is_training",
+                        type=int,
+                        required=True,
+                        default=1,
+                        help="status")
+    parser.add_argument("--model_id",
+                        type=str,
+                        required=True,
+                        default="test",
+                        help="model id")
     parser.add_argument(
         "--model",
         type=str,
@@ -47,30 +51,38 @@ def create_parser():
     )
 
     # data loader
-    parser.add_argument(
-        "--data", type=str, required=True, default="ETTm1", help="dataset type"
-    )
+    parser.add_argument("--data",
+                        type=str,
+                        required=True,
+                        default="ETTm1",
+                        help="dataset type")
     parser.add_argument(
         "--root_path",
         type=str,
         default="./data/ETT/",
         help="root path of the data file",
     )
-    parser.add_argument("--data_path", type=str, default="ETTh1.csv", help="data file")
+    parser.add_argument("--data_path",
+                        type=str,
+                        default="ETTh1.csv",
+                        help="data file")
     parser.add_argument(
         "--features",
         type=str,
         default="M",
-        help="forecasting task, options:[M, S, MS]; M:multivariate predict multivariate, S:univariate predict univariate, MS:multivariate predict univariate",
+        help=
+        "forecasting task, options:[M, S, MS]; M:multivariate predict multivariate, S:univariate predict univariate, MS:multivariate predict univariate",
     )
-    parser.add_argument(
-        "--target", type=str, default="OT", help="target feature in S or MS task"
-    )
+    parser.add_argument("--target",
+                        type=str,
+                        default="OT",
+                        help="target feature in S or MS task")
     parser.add_argument(
         "--freq",
         type=str,
         default="h",
-        help="freq for time features encoding, options:[s:secondly, t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], you can also use more detailed freq like 15min or 3h",
+        help=
+        "freq for time features encoding, options:[s:secondly, t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], you can also use more detailed freq like 15min or 3h",
     )
     parser.add_argument(
         "--checkpoints",
@@ -80,51 +92,89 @@ def create_parser():
     )
 
     # forecasting task
-    parser.add_argument("--seq_len", type=int, default=96, help="input sequence length")
-    parser.add_argument("--label_len", type=int, default=48, help="start token length")
-    parser.add_argument(
-        "--pred_len", type=int, default=96, help="prediction sequence length"
-    )
-    parser.add_argument(
-        "--seasonal_patterns", type=str, default="Monthly", help="subset for M4"
-    )
-    parser.add_argument(
-        "--inverse", action="store_true", help="inverse output data", default=False
-    )
+    parser.add_argument("--seq_len",
+                        type=int,
+                        default=96,
+                        help="input sequence length")
+    parser.add_argument("--label_len",
+                        type=int,
+                        default=48,
+                        help="start token length")
+    parser.add_argument("--pred_len",
+                        type=int,
+                        default=96,
+                        help="prediction sequence length")
+    parser.add_argument("--seasonal_patterns",
+                        type=str,
+                        default="Monthly",
+                        help="subset for M4")
+    parser.add_argument("--inverse",
+                        action="store_true",
+                        help="inverse output data",
+                        default=False)
 
     # inputation task
-    parser.add_argument("--mask_rate", type=float, default=0.25, help="mask ratio")
+    parser.add_argument("--mask_rate",
+                        type=float,
+                        default=0.25,
+                        help="mask ratio")
 
     # anomaly detection task
-    parser.add_argument(
-        "--anomaly_ratio", type=float, default=0.25, help="prior anomaly ratio (%)"
-    )
+    parser.add_argument("--anomaly_ratio",
+                        type=float,
+                        default=0.25,
+                        help="prior anomaly ratio (%)")
 
     # model define
-    parser.add_argument(
-        "--expand", type=int, default=2, help="expansion factor for Mamba"
-    )
-    parser.add_argument(
-        "--d_conv", type=int, default=4, help="conv kernel size for Mamba"
-    )
+    parser.add_argument("--expand",
+                        type=int,
+                        default=2,
+                        help="expansion factor for Mamba")
+    parser.add_argument("--d_conv",
+                        type=int,
+                        default=4,
+                        help="conv kernel size for Mamba")
     parser.add_argument("--top_k", type=int, default=5, help="for TimesBlock")
-    parser.add_argument("--num_kernels", type=int, default=6, help="for Inception")
-    parser.add_argument("--enc_in", type=int, default=7, help="encoder input size")
-    parser.add_argument("--dec_in", type=int, default=7, help="decoder input size")
+    parser.add_argument("--num_kernels",
+                        type=int,
+                        default=6,
+                        help="for Inception")
+    parser.add_argument("--enc_in",
+                        type=int,
+                        default=7,
+                        help="encoder input size")
+    parser.add_argument("--dec_in",
+                        type=int,
+                        default=7,
+                        help="decoder input size")
     parser.add_argument("--c_out", type=int, default=7, help="output size")
-    parser.add_argument("--d_model", type=int, default=512, help="dimension of model")
+    parser.add_argument("--d_model",
+                        type=int,
+                        default=512,
+                        help="dimension of model")
     parser.add_argument("--n_heads", type=int, default=8, help="num of heads")
-    parser.add_argument("--e_layers", type=int, default=2, help="num of encoder layers")
-    parser.add_argument("--d_layers", type=int, default=1, help="num of decoder layers")
-    parser.add_argument("--d_ff", type=int, default=2048, help="dimension of fcn")
-    parser.add_argument(
-        "--moving_avg", type=int, default=25, help="window size of moving average"
-    )
+    parser.add_argument("--e_layers",
+                        type=int,
+                        default=2,
+                        help="num of encoder layers")
+    parser.add_argument("--d_layers",
+                        type=int,
+                        default=1,
+                        help="num of decoder layers")
+    parser.add_argument("--d_ff",
+                        type=int,
+                        default=2048,
+                        help="dimension of fcn")
+    parser.add_argument("--moving_avg",
+                        type=int,
+                        default=25,
+                        help="window size of moving average")
     parser.add_argument("--factor", type=int, default=1, help="attn factor")
     parser.add_argument(
         "--distil",
         action="store_false",
-        help="whether to use distilling in encoder, using this argument means not using distilling",
+        help=
+        "whether to use distilling in encoder, using this argument means not using distilling",
         default=True,
     )
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout")
@@ -134,7 +184,10 @@ def create_parser():
         default="timeF",
         help="time features encoding, options:[timeF, fixed, learned]",
     )
-    parser.add_argument("--activation", type=str, default="gelu", help="activation")
+    parser.add_argument("--activation",
+                        type=str,
+                        default="gelu",
+                        help="activation")
     parser.add_argument(
         "--output_attention",
         action="store_true",
@@ -150,7 +203,8 @@ def create_parser():
         "--decomp_method",
         type=str,
         default="moving_avg",
-        help="method of series decompsition, only support moving_avg or dft_decomp",
+        help=
+        "method of series decompsition, only support moving_avg or dft_decomp",
     )
     parser.add_argument(
         "--use_norm",
@@ -164,9 +218,10 @@ def create_parser():
         default=0,
         help="num of down sampling layers",
     )
-    parser.add_argument(
-        "--down_sampling_window", type=int, default=1, help="down sampling window size"
-    )
+    parser.add_argument("--down_sampling_window",
+                        type=int,
+                        default=1,
+                        help="down sampling window size")
     parser.add_argument(
         "--down_sampling_method",
         type=str,
@@ -181,25 +236,39 @@ def create_parser():
     )
 
     # optimization
-    parser.add_argument(
-        "--num_workers", type=int, default=10, help="data loader num workers"
-    )
+    parser.add_argument("--num_workers",
+                        type=int,
+                        default=10,
+                        help="data loader num workers")
     parser.add_argument("--itr", type=int, default=1, help="experiments times")
-    parser.add_argument("--train_epochs", type=int, default=10, help="train epochs")
-    parser.add_argument(
-        "--batch_size", type=int, default=32, help="batch size of train input data"
-    )
-    parser.add_argument(
-        "--patience", type=int, default=3, help="early stopping patience"
-    )
-    parser.add_argument(
-        "--learning_rate", type=float, default=0.0001, help="optimizer learning rate"
-    )
-    parser.add_argument("--des", type=str, default="test", help="exp description")
-    parser.add_argument("--loss", type=str, default="MSE", help="loss function")
-    parser.add_argument(
-        "--lradj", type=str, default="type1", help="adjust learning rate"
-    )
+    parser.add_argument("--train_epochs",
+                        type=int,
+                        default=10,
+                        help="train epochs")
+    parser.add_argument("--batch_size",
+                        type=int,
+                        default=32,
+                        help="batch size of train input data")
+    parser.add_argument("--patience",
+                        type=int,
+                        default=3,
+                        help="early stopping patience")
+    parser.add_argument("--learning_rate",
+                        type=float,
+                        default=0.0001,
+                        help="optimizer learning rate")
+    parser.add_argument("--des",
+                        type=str,
+                        default="test",
+                        help="exp description")
+    parser.add_argument("--loss",
+                        type=str,
+                        default="MSE",
+                        help="loss function")
+    parser.add_argument("--lradj",
+                        type=str,
+                        default="type1",
+                        help="adjust learning rate")
     parser.add_argument(
         "--use_amp",
         action="store_true",
@@ -210,12 +279,14 @@ def create_parser():
     # GPU
     parser.add_argument("--use_gpu", type=bool, default=True, help="use gpu")
     parser.add_argument("--gpu", type=int, default=0, help="gpu")
-    parser.add_argument(
-        "--use_multi_gpu", action="store_true", help="use multiple gpus", default=False
-    )
-    parser.add_argument(
-        "--devices", type=str, default="0,1,2,3", help="device ids of multile gpus"
-    )
+    parser.add_argument("--use_multi_gpu",
+                        action="store_true",
+                        help="use multiple gpus",
+                        default=False)
+    parser.add_argument("--devices",
+                        type=str,
+                        default="0,1,2,3",
+                        help="device ids of multile gpus")
 
     # de-stationary projector params
     parser.add_argument(
@@ -237,14 +308,19 @@ def create_parser():
         "--use_dtw",
         type=bool,
         default=False,
-        help="the controller of using dtw metric (dtw is time consuming, not suggested unless necessary)",
+        help=
+        "the controller of using dtw metric (dtw is time consuming, not suggested unless necessary)",
     )
 
     # Augmentation
-    parser.add_argument(
-        "--augmentation_ratio", type=int, default=0, help="How many times to augment"
-    )
-    parser.add_argument("--seed", type=int, default=2, help="Randomization seed")
+    parser.add_argument("--augmentation_ratio",
+                        type=int,
+                        default=0,
+                        help="How many times to augment")
+    parser.add_argument("--seed",
+                        type=int,
+                        default=2,
+                        help="Randomization seed")
     parser.add_argument(
         "--jitter",
         default=False,
@@ -335,31 +411,41 @@ def create_parser():
         action="store_true",
         help="Discrimitive shapeDTW warp preset augmentation",
     )
-    parser.add_argument("--extra_tag", type=str, default="", help="Anything extra")
+    parser.add_argument("--extra_tag",
+                        type=str,
+                        default="",
+                        help="Anything extra")
 
     # 新增的自定义参数
-    parser.add_argument("--province_name", type=str, default="", help="province name")
-    parser.add_argument("--industry_id", type=str, default="", help="industry id")
-    parser.add_argument("--train_start", type=str, default="", help="train start")
+    parser.add_argument("--train_start",
+                        type=str,
+                        default="",
+                        help="train start")
     parser.add_argument("--train_end", type=str, default="", help="train end")
-    parser.add_argument("--test_start", type=str, default="", help="test start")
+    parser.add_argument("--test_start",
+                        type=str,
+                        default="",
+                        help="test start")
     # 注意：test_end表示测试集中y能取到的边界
     parser.add_argument("--test_end", type=str, default="", help="test end")
-    parser.add_argument("--pred_start", type=str, default="", help="pred start")
+    parser.add_argument("--pred_start",
+                        type=str,
+                        default="",
+                        help="pred start")
     # 注意：pred_end表示预测数据集中能预测的边界
     parser.add_argument("--pred_end", type=str, default="", help="pred end")
-    parser.add_argument(
-        "--cols", type=str, default="", help="Comma-separated list of features"
-    )
-    parser.add_argument(
-        "--use_autoregression", type=int, default=0, help="is autoregression flag"
-    )
-    parser.add_argument(
-        "--use_best_params",
-        type=int,
-        default=0,
-        help="是否使用最优参数,0表示不使用,1表示使用"
-    )
+    parser.add_argument("--cols",
+                        type=str,
+                        default="",
+                        help="Comma-separated list of features")
+    parser.add_argument("--use_autoregression",
+                        type=int,
+                        default=0,
+                        help="is autoregression flag")
+    parser.add_argument("--use_best_params",
+                        type=int,
+                        default=0,
+                        help="是否使用最优参数,0表示不使用,1表示使用")
     return parser
 
 
@@ -420,6 +506,7 @@ def parse_setting(setting):
 
     return args_dict
 
+
 def load_best_args(args):
     """
     加载最佳参数文件，并更新args中的部分参数
@@ -429,23 +516,7 @@ def load_best_args(args):
         print("发现最佳参数文件，将使用最佳参数")
         with open(best_args_path, "r") as f:
             best_args = json.load(f)
-        # 更新args中的部分参数
-        # not_update_keys = [
-        #     "is_training",
-        #     "province_names",
-        #     "industry_ids",
-        #     "root_path",
-        #     "checkpoints",
-        #     "data_path",
-        #     "train_start",
-        #     "train_end",
-        #     "test_start",
-        #     "test_end",
-        #     "pred_start",
-        #     "pred_end",
-        #     "use_autoregression",
-        # ]
-
+        # 更新args中的部分参数，其实就是定位到参数文件的目录的那些参数
         update_keys = [
             'task_name',
             'model_id',
@@ -468,7 +539,6 @@ def load_best_args(args):
             'des',
             'ii',
         ]
-
 
         for key, value in best_args.items():
             # if key not in not_update_keys:
@@ -523,13 +593,13 @@ def main():
             setting = create_setting(args, ii)
 
             print(
-                ">>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>".format(setting)
-            )
+                ">>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>".format(
+                    setting))
             exp.train(setting)
 
             print(
-                ">>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<".format(setting)
-            )
+                ">>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<".format(
+                    setting))
             exp.test(setting)
             torch.cuda.empty_cache()
     # 测试
@@ -541,15 +611,17 @@ def main():
         setting = create_setting(args, ii)
 
         exp = Exp(args)  # set experiments
-        print(">>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<".format(setting))
+        print(">>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<".format(
+            setting))
         exp.test(setting, load=True)
 
         # 新增代码，用于绘制test结果
-        scaler_y = joblib.load(os.path.join(args.root_path, "preprocessor.bin"))[
-            "scaler_y"
-        ]
-        result_path = os.path.join(args.root_path, setting, "test_results", "data")
-        fig_path = os.path.join(args.root_path, setting, "test_results", "figure")
+        scaler_y = joblib.load(os.path.join(args.root_path,
+                                            "preprocessor.bin"))["scaler_y"]
+        result_path = os.path.join(args.root_path, setting, "test_results",
+                                   "data")
+        fig_path = os.path.join(args.root_path, setting, "test_results",
+                                "figure")
         plot_test_result(
             result_path,
             fig_path,
@@ -569,16 +641,18 @@ def main():
         setting = create_setting(args, ii)
 
         exp = Exp(args)  # set experiments
-        print(">>>>>>>predicting : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<".format(setting))
+        print(">>>>>>>predicting : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<".format(
+            setting))
         exp.predict(setting, load=True)
         torch.cuda.empty_cache()
 
         # 新增代码，用于绘制test结果
-        scaler_y = joblib.load(os.path.join(args.root_path, "preprocessor.bin"))[
-            "scaler_y"
-        ]
-        result_path = os.path.join(args.root_path, setting, "predict_results", "data")
-        fig_path = os.path.join(args.root_path, setting, "predict_results", "figure")
+        scaler_y = joblib.load(os.path.join(args.root_path,
+                                            "preprocessor.bin"))["scaler_y"]
+        result_path = os.path.join(args.root_path, setting, "predict_results",
+                                   "data")
+        fig_path = os.path.join(args.root_path, setting, "predict_results",
+                                "figure")
         plot_predict_result(
             result_path,
             fig_path,
@@ -634,8 +708,11 @@ def main():
         tuner = tune.Tuner(
             tune.with_resources(
                 # objective, resources={"cpu": 2}
-                objective, resources={"cpu": 0, "gpu": 0.25}
-            ),  # 如果使用GPU，可以改为 {"cpu": 1, "gpu": 1}
+                objective,
+                resources={
+                    "cpu": 0,
+                    "gpu": 0.25
+                }),  # 如果使用GPU，可以改为 {"cpu": 1, "gpu": 1}
             tune_config=tune.TuneConfig(
                 metric="val_loss",
                 mode="min",

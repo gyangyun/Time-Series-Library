@@ -183,8 +183,6 @@ for province_name in "${province_names[@]}"; do
         --top_k $top_k \
         --freq $freq \
         --target $target \
-        --province_name $province_name \
-        --industry_id $industry_id \
         --train_start $train_start \
         --train_end $train_end \
         --test_start $test_start \
@@ -203,6 +201,7 @@ use_best_params=1
 root_path="${dataset_path}"
 data_path="${dataset_path}"
 checkpoints="${dataset_path}"
+
 python -u combine_result.py \
 --task_name $task_name \
 --is_training $is_training \

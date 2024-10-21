@@ -38,7 +38,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         return data_set, data_loader
 
     def _select_optimizer(self):
-        model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate)
+        model_optim = optim.Adam(self.model.parameters(),
+                                 lr=self.args.learning_rate)
         return model_optim
 
     def _select_criterion(self):
@@ -50,9 +51,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         total_loss = []
         self.model.eval()
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(
-                vali_loader
-            ):
+            for i, (batch_x, batch_y, batch_x_mark,
+                    batch_y_mark) in enumerate(vali_loader):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float()
 
@@ -60,35 +60,42 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
-                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len :, :]).float()
-                dec_inp = (
-                    torch.cat([batch_y[:, : self.args.label_len, :], dec_inp], dim=1)
-                    .float()
-                    .to(self.device)
-                )
+                dec_inp = torch.zeros_like(
+                    batch_y[:, -self.args.pred_len:, :]).float()
+                dec_inp = (torch.cat(
+                    [batch_y[:, :self.args.label_len, :], dec_inp],
+                    dim=1).float().to(self.device))
                 # encoder - decoder
                 if self.args.use_amp:
                     with torch.cuda.amp.autocast():
                         if self.args.output_attention:
-                            outputs = self.model(
-                                batch_x, batch_x_mark, dec_inp, batch_y_mark
-                            )[0]
+                            outputs = self.model(batch_x, batch_x_mark,
+                                                 dec_inp, batch_y_mark)[0]
                         else:
-                            outputs = self.model(
-                                batch_x, batch_x_mark, dec_inp, batch_y_mark
-                            )
+                            outputs = self.model(batch_x, batch_x_mark,
+                                                 dec_inp, batch_y_mark)
                 else:
                     if self.args.output_attention:
-                        outputs = self.model(
-                            batch_x, batch_x_mark, dec_inp, batch_y_mark
-                        )[0]
+                        outputs = self.model(batch_x, batch_x_mark, dec_inp,
+                                             batch_y_mark)[0]
                     else:
-                        outputs = self.model(
-                            batch_x, batch_x_mark, dec_inp, batch_y_mark
-                        )
-                f_dim = -1 if self.args.features == "MS" else 0
-                outputs = outputs[:, -self.args.pred_len :, f_dim:]
-                batch_y = batch_y[:, -self.args.pred_len :, f_dim:].to(self.device)
+                        outputs = self.model(batch_x, batch_x_mark, dec_inp,
+                                             batch_y_mark)
+
+                # 每个输出结果的多少列参与损失计算
+                # f_dim = -1 if self.args.features == "MS" else 0
+                if self.args.features in ["MS", "S"]:
+                    f_dim = -1
+                else:
+                    if self.args.target == "":
+                        f_dim = 0
+                    else:
+                        targets = [t.strip() for t in self.args.target.split()]
+                        f_dim = -len(targets)
+
+                outputs = outputs[:, -self.args.pred_len:, f_dim:]
+                batch_y = batch_y[:, -self.args.pred_len:,
+                                  f_dim:].to(self.device)
 
                 pred = outputs.detach().cpu()
                 true = batch_y.detach().cpu()
@@ -112,7 +119,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         time_now = time.time()
 
         train_steps = len(train_loader)
-        early_stopping = EarlyStopping(patience=self.args.patience, verbose=True)
+        early_stopping = EarlyStopping(patience=self.args.patience,
+                                       verbose=True)
 
         model_optim = self._select_optimizer()
         criterion = self._select_criterion()
@@ -127,9 +135,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
             self.model.train()
             epoch_time = time.time()
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(
-                train_loader
-            ):
+            for i, (batch_x, batch_y, batch_x_mark,
+                    batch_y_mark) in enumerate(train_loader):
                 iter_count += 1
                 model_optim.zero_grad()
                 batch_x = batch_x.float().to(self.device)
@@ -138,63 +145,64 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
-                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len :, :]).float()
-                dec_inp = (
-                    torch.cat([batch_y[:, : self.args.label_len, :], dec_inp], dim=1)
-                    .float()
-                    .to(self.device)
-                )
+                dec_inp = torch.zeros_like(
+                    batch_y[:, -self.args.pred_len:, :]).float()
+                dec_inp = (torch.cat(
+                    [batch_y[:, :self.args.label_len, :], dec_inp],
+                    dim=1).float().to(self.device))
 
                 # encoder - decoder
                 if self.args.use_amp:
                     with torch.cuda.amp.autocast():
                         if self.args.output_attention:
-                            outputs = self.model(
-                                batch_x, batch_x_mark, dec_inp, batch_y_mark
-                            )[0]
+                            outputs = self.model(batch_x, batch_x_mark,
+                                                 dec_inp, batch_y_mark)[0]
                         else:
-                            outputs = self.model(
-                                batch_x, batch_x_mark, dec_inp, batch_y_mark
-                            )
+                            outputs = self.model(batch_x, batch_x_mark,
+                                                 dec_inp, batch_y_mark)
 
                         f_dim = -1 if self.args.features == "MS" else 0
-                        outputs = outputs[:, -self.args.pred_len :, f_dim:]
-                        batch_y = batch_y[:, -self.args.pred_len :, f_dim:].to(
-                            self.device
-                        )
+                        outputs = outputs[:, -self.args.pred_len:, f_dim:]
+                        batch_y = batch_y[:, -self.args.pred_len:,
+                                          f_dim:].to(self.device)
                         loss = criterion(outputs, batch_y)
                         train_loss.append(loss.item())
                 else:
                     if self.args.output_attention:
-                        outputs = self.model(
-                            batch_x, batch_x_mark, dec_inp, batch_y_mark
-                        )[0]
+                        outputs = self.model(batch_x, batch_x_mark, dec_inp,
+                                             batch_y_mark)[0]
                     else:
-                        outputs = self.model(
-                            batch_x, batch_x_mark, dec_inp, batch_y_mark
-                        )
+                        outputs = self.model(batch_x, batch_x_mark, dec_inp,
+                                             batch_y_mark)
 
-                    f_dim = -1 if self.args.features == "MS" else 0
-                    outputs = outputs[:, -self.args.pred_len :, f_dim:]
-                    batch_y = batch_y[:, -self.args.pred_len :, f_dim:].to(self.device)
+                    # 每个输出结果的多少列参与损失计算
+                    # f_dim = -1 if self.args.features == "MS" else 0
+                    if self.args.features in ["MS", "S"]:
+                        f_dim = -1
+                    else:
+                        if self.args.target == "":
+                            f_dim = 0
+                        else:
+                            targets = [
+                                t.strip() for t in self.args.target.split()
+                            ]
+                            f_dim = -len(targets)
+
+                    outputs = outputs[:, -self.args.pred_len:, f_dim:]
+                    batch_y = batch_y[:, -self.args.pred_len:,
+                                      f_dim:].to(self.device)
+
                     loss = criterion(outputs, batch_y)
                     train_loss.append(loss.item())
 
                 if (i + 1) % 100 == 0:
-                    print(
-                        "\titers: {0}, epoch: {1} | loss: {2:.7f}".format(
-                            i + 1, epoch + 1, loss.item()
-                        )
-                    )
+                    print("\titers: {0}, epoch: {1} | loss: {2:.7f}".format(
+                        i + 1, epoch + 1, loss.item()))
                     speed = (time.time() - time_now) / iter_count
                     left_time = speed * (
-                        (self.args.train_epochs - epoch) * train_steps - i
-                    )
-                    print(
-                        "\tspeed: {:.4f}s/iter; left time: {:.4f}s".format(
-                            speed, left_time
-                        )
-                    )
+                        (self.args.train_epochs - epoch) * train_steps - i)
+                    print("\tspeed: {:.4f}s/iter; left time: {:.4f}s".format(
+                        speed, left_time))
                     iter_count = 0
                     time_now = time.time()
 
@@ -206,16 +214,16 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     loss.backward()
                     model_optim.step()
 
-            print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
+            print("Epoch: {} cost time: {}".format(epoch + 1,
+                                                   time.time() - epoch_time))
             train_loss = np.average(train_loss)
             vali_loss = self.vali(vali_data, vali_loader, criterion)
             test_loss = self.vali(test_data, test_loader, criterion)
 
             print(
-                "Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
-                    epoch + 1, train_steps, train_loss, vali_loss, test_loss
-                )
-            )
+                "Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}"
+                .format(epoch + 1, train_steps, train_loss, vali_loss,
+                        test_loss))
 
             # 每个epoch都更新最佳验证损失，以便使用超参搜索时作为优化目标
             if vali_loss < best_vali_loss:
@@ -237,26 +245,22 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         test_data, test_loader = self._get_data(flag="test")
         if load:
             print("loading model")
-            best_model_path = os.path.join(
-                self.args.checkpoints, setting, "checkpoint.pth"
-            )
+            best_model_path = os.path.join(self.args.checkpoints, setting,
+                                           "checkpoint.pth")
             self.model.load_state_dict(
-                torch.load(best_model_path, map_location=self.device)
-            )
+                torch.load(best_model_path, map_location=self.device))
 
         preds = []
         trues = []
-        folder_path = os.path.join(
-            self.args.root_path, setting, "test_results", "figure"
-        )
+        folder_path = os.path.join(self.args.root_path, setting,
+                                   "test_results", "figure")
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
         self.model.eval()
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(
-                test_loader
-            ):
+            for i, (batch_x, batch_y, batch_x_mark,
+                    batch_y_mark) in enumerate(test_loader):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
 
@@ -264,47 +268,55 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
-                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len :, :]).float()
-                dec_inp = (
-                    torch.cat([batch_y[:, : self.args.label_len, :], dec_inp], dim=1)
-                    .float()
-                    .to(self.device)
-                )
+                dec_inp = torch.zeros_like(
+                    batch_y[:, -self.args.pred_len:, :]).float()
+                dec_inp = (torch.cat(
+                    [batch_y[:, :self.args.label_len, :], dec_inp],
+                    dim=1).float().to(self.device))
                 # encoder - decoder
                 if self.args.use_amp:
                     with torch.cuda.amp.autocast():
                         if self.args.output_attention:
-                            outputs = self.model(
-                                batch_x, batch_x_mark, dec_inp, batch_y_mark
-                            )[0]
+                            outputs = self.model(batch_x, batch_x_mark,
+                                                 dec_inp, batch_y_mark)[0]
                         else:
-                            outputs = self.model(
-                                batch_x, batch_x_mark, dec_inp, batch_y_mark
-                            )
+                            outputs = self.model(batch_x, batch_x_mark,
+                                                 dec_inp, batch_y_mark)
                 else:
                     if self.args.output_attention:
-                        outputs = self.model(
-                            batch_x, batch_x_mark, dec_inp, batch_y_mark
-                        )[0]
+                        outputs = self.model(batch_x, batch_x_mark, dec_inp,
+                                             batch_y_mark)[0]
 
                     else:
-                        outputs = self.model(
-                            batch_x, batch_x_mark, dec_inp, batch_y_mark
-                        )
+                        outputs = self.model(batch_x, batch_x_mark, dec_inp,
+                                             batch_y_mark)
 
-                f_dim = -1 if self.args.features == "MS" else 0
-                outputs = outputs[:, -self.args.pred_len :, :]
-                batch_y = batch_y[:, -self.args.pred_len :, :].to(self.device)
-                outputs = outputs.detach().cpu().numpy()
-                batch_y = batch_y.detach().cpu().numpy()
+                # 每个输出结果的多少列参与损失计算
+                # f_dim = -1 if self.args.features == "MS" else 0
+                if self.args.features in ["MS", "S"]:
+                    f_dim = -1
+                else:
+                    if self.args.target == "":
+                        f_dim = 0
+                    else:
+                        targets = [t.strip() for t in self.args.target.split()]
+                        f_dim = -len(targets)
+
+                outputs = outputs[:, -self.args.pred_len:, f_dim:]
+                batch_y = batch_y[:, -self.args.pred_len:,
+                                  f_dim:].to(self.device)
+
+                pred = outputs.detach().cpu()
+                true = batch_y.detach().cpu()
+
                 if test_data.scale and self.args.inverse:
                     shape = outputs.shape
                     outputs = test_data.inverse_transform(
-                        outputs.reshape(shape[0] * shape[1], -1)
-                    ).reshape(shape)
+                        outputs.reshape(shape[0] * shape[1],
+                                        -1)).reshape(shape)
                     batch_y = test_data.inverse_transform(
-                        batch_y.reshape(shape[0] * shape[1], -1)
-                    ).reshape(shape)
+                        batch_y.reshape(shape[0] * shape[1],
+                                        -1)).reshape(shape)
 
                 outputs = outputs[:, :, f_dim:]
                 batch_y = batch_y[:, :, f_dim:]
@@ -334,7 +346,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         print("test shape:", preds.shape, trues.shape)
 
         # result save
-        folder_path = os.path.join(self.args.root_path, setting, "test_results", "data")
+        folder_path = os.path.join(self.args.root_path, setting,
+                                   "test_results", "data")
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
@@ -360,7 +373,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         # 获取当前时间
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         # 文件路径
-        file_path = os.path.join(self.args.root_path, "result_long_term_forecast.csv")
+        file_path = os.path.join(self.args.root_path,
+                                 "result_long_term_forecast.csv")
         # 检查文件是否存在，如果不存在则创建并写入表头
         file_exists = os.path.isfile(file_path)
         # 打开CSV文件，准备写入数据
@@ -369,25 +383,24 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
             # 如果文件不存在，先写入表头
             if not file_exists:
-                writer.writerow(
-                    [
-                        "setting",
-                        "mae",
-                        "mse",
-                        "rmse",
-                        "mape",
-                        "mspe",
-                        "smape",
-                        "r2",
-                        "dtw",
-                        "timestamp",
-                    ]
-                )
+                writer.writerow([
+                    "setting",
+                    "mae",
+                    "mse",
+                    "rmse",
+                    "mape",
+                    "mspe",
+                    "smape",
+                    "r2",
+                    "dtw",
+                    "timestamp",
+                ])
 
             # 写入数据，包含各个评价指标和当前时间
-            writer.writerow(
-                [setting, mae, mse, rmse, mape, mspe, smape, r2, dtw, current_time]
-            )
+            writer.writerow([
+                setting, mae, mse, rmse, mape, mspe, smape, r2, dtw,
+                current_time
+            ])
 
         # mae, mse, rmse, mape, mspe = metric(preds, trues)
         # print("mse:{}, mae:{}, dtw:{}".format(mse, mae, dtw))
@@ -425,12 +438,10 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         if load:
             print("loading model")
-            best_model_path = os.path.join(
-                self.args.checkpoints, setting, "checkpoint.pth"
-            )
+            best_model_path = os.path.join(self.args.checkpoints, setting,
+                                           "checkpoint.pth")
             self.model.load_state_dict(
-                torch.load(best_model_path, map_location=self.device)
-            )
+                torch.load(best_model_path, map_location=self.device))
 
         preds = []
 
@@ -443,22 +454,21 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     [],
                     [],
                 )
-                for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(
-                    pred_loader
-                ):
+                for i, (batch_x, batch_y, batch_x_mark,
+                        batch_y_mark) in enumerate(pred_loader):
                     all_batch_x.append(batch_x)
                     all_batch_y.append(batch_y)
                     all_batch_x_mark.append(batch_x_mark)
                     all_batch_y_mark.append(batch_y_mark)
 
-                all_batch_x = torch.cat(all_batch_x, dim=0).float().to(self.device)
-                all_batch_y = torch.cat(all_batch_y, dim=0).float().to(self.device)
-                all_batch_x_mark = (
-                    torch.cat(all_batch_x_mark, dim=0).float().to(self.device)
-                )
-                all_batch_y_mark = (
-                    torch.cat(all_batch_y_mark, dim=0).float().to(self.device)
-                )
+                all_batch_x = torch.cat(all_batch_x,
+                                        dim=0).float().to(self.device)
+                all_batch_y = torch.cat(all_batch_y,
+                                        dim=0).float().to(self.device)
+                all_batch_x_mark = (torch.cat(all_batch_x_mark,
+                                              dim=0).float().to(self.device))
+                all_batch_y_mark = (torch.cat(all_batch_y_mark,
+                                              dim=0).float().to(self.device))
 
                 for i in range(all_batch_x.shape[0]):
                     # 提取当前时间步的数据
@@ -467,44 +477,50 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     current_x_mark = all_batch_x_mark[i, :, :].unsqueeze(0)
                     current_y_mark = all_batch_y_mark[i, :, :].unsqueeze(0)
 
-                    dec_inp = (
-                        torch.zeros(
-                            [current_y.shape[0], self.args.pred_len, current_y.shape[2]]
-                        )
-                        .float()
-                        .to(self.device)
-                    )
-                    dec_inp = (
-                        torch.cat(
-                            [current_y[:, : self.args.label_len, :], dec_inp], dim=1
-                        )
-                        .float()
-                        .to(self.device)
-                    )
+                    dec_inp = (torch.zeros([
+                        current_y.shape[0], self.args.pred_len,
+                        current_y.shape[2]
+                    ]).float().to(self.device))
+                    dec_inp = (torch.cat(
+                        [current_y[:, :self.args.label_len, :], dec_inp],
+                        dim=1).float().to(self.device))
 
                     if self.args.use_amp:
                         with torch.cuda.amp.autocast():
                             if self.args.output_attention:
                                 current_outputs = self.model(
-                                    current_x, current_x_mark, dec_inp, current_x_mark
-                                )[0]
+                                    current_x, current_x_mark, dec_inp,
+                                    current_x_mark)[0]
                             else:
                                 current_outputs = self.model(
-                                    current_x, current_x_mark, dec_inp, current_x_mark
-                                )
+                                    current_x, current_x_mark, dec_inp,
+                                    current_x_mark)
                     else:
                         if self.args.output_attention:
                             current_outputs = self.model(
-                                current_x, current_x_mark, dec_inp, current_x_mark
-                            )[0]
+                                current_x, current_x_mark, dec_inp,
+                                current_x_mark)[0]
                         else:
                             current_outputs = self.model(
-                                current_x, current_x_mark, dec_inp, current_x_mark
-                            )
+                                current_x, current_x_mark, dec_inp,
+                                current_x_mark)
 
-                    f_dim = -1 if self.args.features == "MS" else 0
+                    # 每个输出结果的多少列为关注的输出值
+                    # f_dim = -1 if self.args.features == "MS" else 0
+                    if self.args.features in ["MS", "S"]:
+                        f_dim = -1
+                    else:
+                        if self.args.target == "":
+                            f_dim = 0
+                        else:
+                            targets = [
+                                t.strip() for t in self.args.target.split()
+                            ]
+                            f_dim = -len(targets)
+
                     # 取出本次预测的所有步长，因为是逐条数据预测，所以其实第一维是1
-                    current_outputs = current_outputs[:, -self.args.pred_len :, f_dim:]
+                    current_outputs = current_outputs[:, -self.args.pred_len:,
+                                                      f_dim:]
 
                     # 将未逆标准化的预测结果更新到all_batch_x中的下一时间步及所有之后的时间步中，以及all_batch_y中的dec_input的start_token部分
                     # 注意：这里只取了预测结果中的第一个current_outputs[:, 0, f_dim:]，因为原模型的pred_len不一定等于1
@@ -514,78 +530,76 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         # 注意：可能出现seq_len<to_pred_len的情况
                         # 比如要预测未来100个时间步，即all_batch_x.shape[0](to_pred_len=100)，实际seq_len只有14步，即all_batch_y的第二维实际只有seq_len==14步
                         if -(j - i) >= -all_batch_x.shape[1]:
-                            all_batch_x[j, -(j - i), f_dim:] = current_outputs[
-                                :, 0, f_dim:
-                            ]
+                            all_batch_x[j, -(j - i),
+                                        f_dim:] = current_outputs[:, 0, f_dim:]
                         # 逐时间步更新all_batch_y，但是注意：可能出现label_len<to_pred_len的情况
                         # 比如要预测未来100个时间步，即all_batch_x.shape[0](to_pred_len=100)，实际label_len只有14步，pred_len只有1步，all_batch_y的第二维实际只有label_len+pred_len==15步
-                        if -self.args.pred_len - (j - i) >= -all_batch_y.shape[1]:
-                            all_batch_y[j, -self.args.pred_len - (j - i), f_dim:] = (
-                                current_outputs[:, 0, f_dim:]
-                            )
+                        if -self.args.pred_len - (j -
+                                                  i) >= -all_batch_y.shape[1]:
+                            all_batch_y[j, -self.args.pred_len - (j - i),
+                                        f_dim:] = (current_outputs[:, 0,
+                                                                   f_dim:])
 
                     current_outputs = current_outputs.detach().cpu().numpy()
                     # 将逆标准化的预测结果添加到最终预测结果中
                     if pred_data.scale and self.args.inverse:
                         shape = current_outputs.shape
                         current_outputs = pred_data.inverse_transform(
-                            current_outputs.reshape(shape[0] * shape[1], -1)
-                        ).reshape(shape)
+                            current_outputs.reshape(shape[0] * shape[1],
+                                                    -1)).reshape(shape)
 
                     preds.append(current_outputs)
             else:
-                for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(
-                    pred_loader
-                ):
+                for i, (batch_x, batch_y, batch_x_mark,
+                        batch_y_mark) in enumerate(pred_loader):
                     batch_x = batch_x.float().to(self.device)
                     batch_y = batch_y.float().to(self.device)
                     batch_x_mark = batch_x_mark.float().to(self.device)
                     batch_y_mark = batch_y_mark.float().to(self.device)
 
-                    dec_inp = (
-                        torch.zeros(
-                            [batch_y.shape[0], self.args.pred_len, batch_y.shape[2]]
-                        )
-                        .float()
-                        .to(self.device)
-                    )
-                    dec_inp = (
-                        torch.cat(
-                            [batch_y[:, : self.args.label_len, :], dec_inp], dim=1
-                        )
-                        .float()
-                        .to(self.device)
-                    )
+                    dec_inp = (torch.zeros([
+                        batch_y.shape[0], self.args.pred_len, batch_y.shape[2]
+                    ]).float().to(self.device))
+                    dec_inp = (torch.cat(
+                        [batch_y[:, :self.args.label_len, :], dec_inp],
+                        dim=1).float().to(self.device))
 
                     if self.args.use_amp:
                         with torch.cuda.amp.autocast():
                             if self.args.output_attention:
-                                outputs = self.model(
-                                    batch_x, batch_x_mark, dec_inp, batch_y_mark
-                                )[0]
+                                outputs = self.model(batch_x, batch_x_mark,
+                                                     dec_inp, batch_y_mark)[0]
                             else:
-                                outputs = self.model(
-                                    batch_x, batch_x_mark, dec_inp, batch_y_mark
-                                )
+                                outputs = self.model(batch_x, batch_x_mark,
+                                                     dec_inp, batch_y_mark)
                     else:
                         if self.args.output_attention:
-                            outputs = self.model(
-                                batch_x, batch_x_mark, dec_inp, batch_y_mark
-                            )[0]
+                            outputs = self.model(batch_x, batch_x_mark,
+                                                 dec_inp, batch_y_mark)[0]
                         else:
-                            outputs = self.model(
-                                batch_x, batch_x_mark, dec_inp, batch_y_mark
-                            )
+                            outputs = self.model(batch_x, batch_x_mark,
+                                                 dec_inp, batch_y_mark)
 
-                    f_dim = -1 if self.args.features == "MS" else 0
-                    outputs = outputs[:, -self.args.pred_len :, f_dim:]
+                    # 每个输出结果的多少列为关注的输出值
+                    # f_dim = -1 if self.args.features == "MS" else 0
+                    if self.args.features in ["MS", "S"]:
+                        f_dim = -1
+                    else:
+                        if self.args.target == "":
+                            f_dim = 0
+                        else:
+                            targets = [
+                                t.strip() for t in self.args.target.split()
+                            ]
+                            f_dim = -len(targets)
+                    outputs = outputs[:, -self.args.pred_len:, f_dim:]
 
                     outputs = outputs.detach().cpu().numpy()
                     if pred_data.scale and self.args.inverse:
                         shape = outputs.shape
                         outputs = pred_data.inverse_transform(
-                            outputs.reshape(shape[0] * shape[1], -1)
-                        ).reshape(shape)
+                            outputs.reshape(shape[0] * shape[1],
+                                            -1)).reshape(shape)
 
                     preds.append(outputs)
 
@@ -614,9 +628,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             else:
                 preds = preds
 
-        folder_path = os.path.join(
-            self.args.root_path, setting, "predict_results", "data"
-        )
+        folder_path = os.path.join(self.args.root_path, setting,
+                                   "predict_results", "data")
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
