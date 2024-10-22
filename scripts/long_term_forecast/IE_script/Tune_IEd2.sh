@@ -37,8 +37,8 @@ down_sampling_method="avg"
 
 # -------------------------训练参数-------------------------
 itr=1
-# train_epochs=30
-train_epochs=1
+train_epochs=30
+# train_epochs=1
 batch_size=16
 top_k=5
 description="Exp"
@@ -46,8 +46,8 @@ description="Exp"
 model_id="IEd2"
 
 # -------------------------数据集相关参数-------------------------
-# dataset_path="/home/guoyy/Workspace/ts/lib/ElecForcastPrep/cache/dataset/deep_learning"
-dataset_path="/Users/guoyangyun/计量中心/16.分析报告/分析/智能报表/ElecForcastPrep/cache/dataset/deep_learningV2"
+dataset_path="/home/guoyy/Workspace/ts/lib/ElecForcastPrep/cache/dataset/deep_learningV2"
+# dataset_path="/Users/guoyangyun/计量中心/16.分析报告/分析/智能报表/ElecForcastPrep/cache/dataset/deep_learningV2"
 
 data_name="IEd1"
 freq="d"
@@ -61,19 +61,19 @@ target=(
 )
 
 # -------------------------时间范围参数-------------------------
-train_start="2024-01-01"
-train_end="2024-02-29"
-test_start="2024-03-07"
-test_end="2024-03-09"
-pred_start="2024-03-10"
-pred_end="2024-03-15"
+# train_start="2024-01-01"
+# train_end="2024-02-29"
+# test_start="2024-03-07"
+# test_end="2024-03-09"
+# pred_start="2024-03-10"
+# pred_end="2024-03-15"
 
-# train_start="2022-01-01"
-# train_end="2024-06-30"
-# test_start="2024-07-01"
-# test_end="2024-09-30"
-# pred_start="2024-10-01"
-# pred_end="2024-10-31"
+train_start="2022-01-01"
+train_end="2024-06-30"
+test_start="2024-09-01"
+test_end="2024-09-30"
+pred_start="2024-10-01"
+pred_end="2024-10-31"
 # -------------------------特征列表-------------------------
 cols=(
     "date"
@@ -111,9 +111,9 @@ for province_name in "${province_names[@]}"; do
     # 在这里进行你需要的操作，例如打印路径
     echo "处理路径: ${root_path}"
     # =========================train=========================
-    is_training=1
-    use_autoregression=1
-    use_best_params=0
+    # is_training=1
+    # use_autoregression=1
+    # use_best_params=0
     # =========================test=========================
     # is_training=0
     # use_autoregression=0
@@ -123,102 +123,104 @@ for province_name in "${province_names[@]}"; do
     # use_autoregression=1
     # use_best_params=0
     # =========================predict=========================
-    # is_training=2
-    # data_path="predict_dataset.pkl"
-    # use_autoregression=1
-    # use_best_params=1
+    is_training=2
+    data_path="predict_dataset.pkl"
+    use_autoregression=1
+    use_best_params=1
     # =========================运行脚本=========================
-    python -u run.py \
-    --task_name $task_name \
-    --is_training $is_training \
-    --root_path $root_path \
-    --data_path $data_path \
-    --model_id $model_id \
-    --model $model_name \
-    --data $data_name \
-    --features $features \
-    --checkpoints $checkpoints \
-    --seq_len $seq_len \
-    --label_len $label_len \
-    --pred_len $pred_len \
-    --n_heads $n_heads \
-    --e_layers $e_layers \
-    --d_layers $d_layers \
-    --factor $factor \
-    --enc_in $enc_in \
-    --dec_in $dec_in \
-    --c_out $c_out \
-    --d_model $d_model \
-    --d_ff $d_ff \
-    --down_sampling_layers $down_sampling_layers \
-    --down_sampling_window $down_sampling_window \
-    --down_sampling_method $down_sampling_method \
-    --des $description \
-    --itr $itr \
-    --train_epochs $train_epochs \
-    --batch_size $batch_size \
-    --top_k $top_k \
-    --freq $freq \
-    --target "${target[*]}" \
-    --train_start $train_start \
-    --train_end $train_end \
-    --test_start $test_start \
-    --test_end $test_end \
-    --pred_start $pred_start \
-    --pred_end $pred_end \
-    --cols "${cols[*]}" \
-    --use_autoregression $use_autoregression \
-    --use_best_params $use_best_params
+    # python -u run.py \
+    # --task_name $task_name \
+    # --is_training $is_training \
+    # --root_path $root_path \
+    # --data_path $data_path \
+    # --model_id $model_id \
+    # --model $model_name \
+    # --data $data_name \
+    # --features $features \
+    # --checkpoints $checkpoints \
+    # --seq_len $seq_len \
+    # --label_len $label_len \
+    # --pred_len $pred_len \
+    # --n_heads $n_heads \
+    # --e_layers $e_layers \
+    # --d_layers $d_layers \
+    # --factor $factor \
+    # --enc_in $enc_in \
+    # --dec_in $dec_in \
+    # --c_out $c_out \
+    # --d_model $d_model \
+    # --d_ff $d_ff \
+    # --down_sampling_layers $down_sampling_layers \
+    # --down_sampling_window $down_sampling_window \
+    # --down_sampling_method $down_sampling_method \
+    # --des $description \
+    # --itr $itr \
+    # --train_epochs $train_epochs \
+    # --batch_size $batch_size \
+    # --top_k $top_k \
+    # --freq $freq \
+    # --target "${target[*]}" \
+    # --train_start $train_start \
+    # --train_end $train_end \
+    # --test_start $test_start \
+    # --test_end $test_end \
+    # --pred_start $pred_start \
+    # --pred_end $pred_end \
+    # --cols "${cols[*]}" \
+    # --use_autoregression $use_autoregression \
+    # --use_best_params $use_best_params
 done
 # =========================合并结果=========================
-# is_training=0
-# use_autoregression=1
-# use_best_params=1
-# root_path="${dataset_path}"
-# data_path="${dataset_path}"
-# checkpoints="${dataset_path}"
+is_training=0
+use_autoregression=1
+use_best_params=1
+root_path="${dataset_path}"
+data_path="${dataset_path}"
+checkpoints="${dataset_path}"
+use_multi=1
 
-# python -u combine_result.py \
-# --task_name $task_name \
-# --is_training $is_training \
-# --root_path $root_path \
-# --data_path $data_path \
-# --dataset_path $dataset_path \
-# --model_id $model_id \
-# --model $model_name \
-# --data $data_name \
-# --features $features \
-# --checkpoints $checkpoints \
-# --seq_len $seq_len \
-# --label_len $label_len \
-# --pred_len $pred_len \
-# --n_heads $n_heads \
-# --e_layers $e_layers \
-# --d_layers $d_layers \
-# --factor $factor \
-# --enc_in $enc_in \
-# --dec_in $dec_in \
-# --c_out $c_out \
-# --d_model $d_model \
-# --d_ff $d_ff \
-# --down_sampling_layers $down_sampling_layers \
-# --down_sampling_window $down_sampling_window \
-# --down_sampling_method $down_sampling_method \
-# --des $description \
-# --itr $itr \
-# --train_epochs $train_epochs \
-# --batch_size $batch_size \
-# --top_k $top_k \
-# --freq $freq \
-# --target "${target[*]}" \
-# --province_names "${province_names[*]}" \
-# --industry_ids "${industry_ids[*]}"  \
-# --train_start $train_start \
-# --train_end $train_end \
-# --test_start $test_start \
-# --test_end $test_end \
-# --pred_start $pred_start \
-# --pred_end $pred_end \
-# --cols "${cols[*]}" \
-# --use_autoregression $use_autoregression \
-# --use_best_params $use_best_params
+python -u combine_result.py \
+--task_name $task_name \
+--is_training $is_training \
+--root_path $root_path \
+--data_path $data_path \
+--dataset_path $dataset_path \
+--model_id $model_id \
+--model $model_name \
+--data $data_name \
+--features $features \
+--checkpoints $checkpoints \
+--seq_len $seq_len \
+--label_len $label_len \
+--pred_len $pred_len \
+--n_heads $n_heads \
+--e_layers $e_layers \
+--d_layers $d_layers \
+--factor $factor \
+--enc_in $enc_in \
+--dec_in $dec_in \
+--c_out $c_out \
+--d_model $d_model \
+--d_ff $d_ff \
+--down_sampling_layers $down_sampling_layers \
+--down_sampling_window $down_sampling_window \
+--down_sampling_method $down_sampling_method \
+--des $description \
+--itr $itr \
+--train_epochs $train_epochs \
+--batch_size $batch_size \
+--top_k $top_k \
+--freq $freq \
+--target "${target[*]}" \
+--province_names "${province_names[*]}" \
+--industry_ids "${industry_ids[*]}"  \
+--train_start $train_start \
+--train_end $train_end \
+--test_start $test_start \
+--test_end $test_end \
+--pred_start $pred_start \
+--pred_end $pred_end \
+--cols "${cols[*]}" \
+--use_autoregression $use_autoregression \
+--use_best_params $use_best_params \
+--use_multi $use_multi

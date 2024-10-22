@@ -306,9 +306,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 batch_y = batch_y[:, -self.args.pred_len:,
                                   f_dim:].to(self.device)
 
-                pred = outputs.detach().cpu()
-                true = batch_y.detach().cpu()
-
                 if test_data.scale and self.args.inverse:
                     shape = outputs.shape
                     outputs = test_data.inverse_transform(
@@ -318,11 +315,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         batch_y.reshape(shape[0] * shape[1],
                                         -1)).reshape(shape)
 
-                outputs = outputs[:, :, f_dim:]
-                batch_y = batch_y[:, :, f_dim:]
-
-                pred = outputs
-                true = batch_y
+                pred = outputs.detach().cpu()
+                true = batch_y.detach().cpu()
 
                 preds.append(pred)
                 trues.append(true)

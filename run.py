@@ -702,7 +702,7 @@ def main():
         # OptunaSearch是随机搜索算法，所以无法使用grid_search
         # 要使用grid_search请使用tune的默认搜索算法，即不指定search_alg
         # 而使用grid_search时，num_samples表示重复次数，请勿设置
-        search_alg = OptunaSearch()
+        # search_alg = OptunaSearch()
 
         # 设置Tuner
         tuner = tune.Tuner(
