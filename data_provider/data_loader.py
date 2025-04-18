@@ -438,8 +438,12 @@ class Dataset_M4(Dataset):
         insample[-len(insample_window):, 0] = insample_window
         insample_mask[-len(insample_window):, 0] = 1.0
         outsample_window = sampled_timeseries[
+<<<<<<< HEAD
             cut_point - self.label_len:min(len(sampled_timeseries), cut_point +
                                            self.pred_len)]
+=======
+                           max(0, cut_point - self.label_len):min(len(sampled_timeseries), cut_point + self.pred_len)]
+>>>>>>> upstream/main
         outsample[:len(outsample_window), 0] = outsample_window
         outsample_mask[:len(outsample_window), 0] = 1.0
         return insample, outsample, insample_mask, outsample_mask
@@ -798,9 +802,9 @@ class UEAloader(Dataset):
 
     def load_all(self, root_path, file_list=None, flag=None):
         """
-        Loads datasets from csv files contained in `root_path` into a dataframe, optionally choosing from `pattern`
+        Loads datasets from ts files contained in `root_path` into a dataframe, optionally choosing from `pattern`
         Args:
-            root_path: directory containing all individual .csv files
+            root_path: directory containing all individual .ts files
             file_list: optionally, provide a list of file paths within `root_path` to consider.
                 Otherwise, entire `root_path` contents will be used.
         Returns:

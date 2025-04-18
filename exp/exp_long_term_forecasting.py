@@ -4,6 +4,9 @@ import time
 import warnings
 from datetime import datetime
 from functools import partial
+import numpy as np
+from utils.dtw_metric import dtw, accelerated_dtw
+from utils.augmentation import run_augmentation, run_augmentation_single
 
 import numpy as np
 import pandas as pd
@@ -46,6 +49,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         # criterion = nn.MSELoss()
         criterion = CustomLoss(partial(asymmetric_mse_loss, alpha=2.5))
         return criterion
+ 
 
     def vali(self, vali_data, vali_loader, criterion):
         total_loss = []
@@ -68,6 +72,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 # encoder - decoder
                 if self.args.use_amp:
                     with torch.cuda.amp.autocast():
+<<<<<<< HEAD
                         if self.args.output_attention:
                             outputs = self.model(batch_x, batch_x_mark,
                                                  dec_inp, batch_y_mark)[0]
@@ -93,6 +98,12 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         targets = [t.strip() for t in self.args.target.split()]
                         f_dim = -len(targets)
 
+=======
+                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                else:
+                    outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                f_dim = -1 if self.args.features == 'MS' else 0
+>>>>>>> upstream/main
                 outputs = outputs[:, -self.args.pred_len:, f_dim:]
                 batch_y = batch_y[:, -self.args.pred_len:,
                                   f_dim:].to(self.device)
@@ -168,6 +179,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         loss = criterion(outputs, batch_y)
                         train_loss.append(loss.item())
                 else:
+<<<<<<< HEAD
                     if self.args.output_attention:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp,
                                              batch_y_mark)[0]
@@ -187,6 +199,9 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                                 t.strip() for t in self.args.target.split()
                             ]
                             f_dim = -len(targets)
+=======
+                    outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+>>>>>>> upstream/main
 
                     outputs = outputs[:, -self.args.pred_len:, f_dim:]
                     batch_y = batch_y[:, -self.args.pred_len:,
@@ -276,6 +291,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 # encoder - decoder
                 if self.args.use_amp:
                     with torch.cuda.amp.autocast():
+<<<<<<< HEAD
                         if self.args.output_attention:
                             outputs = self.model(batch_x, batch_x_mark,
                                                  dec_inp, batch_y_mark)[0]
@@ -305,8 +321,14 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 outputs = outputs[:, -self.args.pred_len:, f_dim:]
                 batch_y = batch_y[:, -self.args.pred_len:,
                                   f_dim:].to(self.device)
+=======
+                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                else:
+                    outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+>>>>>>> upstream/main
 
                 if test_data.scale and self.args.inverse:
+<<<<<<< HEAD
                     shape = outputs.shape
                     outputs = test_data.inverse_transform(
                         outputs.reshape(shape[0] * shape[1],
@@ -314,6 +336,16 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     batch_y = test_data.inverse_transform(
                         batch_y.reshape(shape[0] * shape[1],
                                         -1)).reshape(shape)
+=======
+                    shape = batch_y.shape
+                    if outputs.shape[-1] != batch_y.shape[-1]:
+                        outputs = np.tile(outputs, [1, 1, int(batch_y.shape[-1] / outputs.shape[-1])])
+                    outputs = test_data.inverse_transform(outputs.reshape(shape[0] * shape[1], -1)).reshape(shape)
+                    batch_y = test_data.inverse_transform(batch_y.reshape(shape[0] * shape[1], -1)).reshape(shape)
+
+                outputs = outputs[:, :, f_dim:]
+                batch_y = batch_y[:, :, f_dim:]
+>>>>>>> upstream/main
 
                 pred = outputs.detach().cpu()
                 true = batch_y.detach().cpu()
@@ -358,7 +390,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 dtw_list.append(d)
             dtw = np.array(dtw_list).mean()
         else:
-            dtw = -999
+            dtw = 'Not calculated'
 
         # 记录各项评测指标到csv文件
         mae, mse, rmse, mape, mspe, smape, r2 = metric(preds, trues)
