@@ -19,6 +19,7 @@ warnings.filterwarnings("ignore")
 
 
 class Dataset_ETT_hour(Dataset):
+
     def __init__(
         self,
         args,
@@ -133,6 +134,7 @@ class Dataset_ETT_hour(Dataset):
 
 
 class Dataset_ETT_minute(Dataset):
+
     def __init__(
         self,
         args,
@@ -249,6 +251,7 @@ class Dataset_ETT_minute(Dataset):
 
 
 class Dataset_Custom(Dataset):
+
     def __init__(
         self,
         args,
@@ -367,6 +370,7 @@ class Dataset_Custom(Dataset):
 
 
 class Dataset_M4(Dataset):
+
     def __init__(
         self,
         args,
@@ -438,12 +442,9 @@ class Dataset_M4(Dataset):
         insample[-len(insample_window):, 0] = insample_window
         insample_mask[-len(insample_window):, 0] = 1.0
         outsample_window = sampled_timeseries[
-<<<<<<< HEAD
-            cut_point - self.label_len:min(len(sampled_timeseries), cut_point +
-                                           self.pred_len)]
-=======
-                           max(0, cut_point - self.label_len):min(len(sampled_timeseries), cut_point + self.pred_len)]
->>>>>>> upstream/main
+            max(0, cut_point -
+                self.label_len):min(len(sampled_timeseries), cut_point +
+                                    self.pred_len)]
         outsample[:len(outsample_window), 0] = outsample_window
         outsample_mask[:len(outsample_window), 0] = 1.0
         return insample, outsample, insample_mask, outsample_mask
@@ -471,6 +472,7 @@ class Dataset_M4(Dataset):
 
 
 class PSMSegLoader(Dataset):
+
     def __init__(self, args, root_path, win_size, step=1, flag="train"):
         self.flag = flag
         self.step = step
@@ -529,6 +531,7 @@ class PSMSegLoader(Dataset):
 
 
 class MSLSegLoader(Dataset):
+
     def __init__(self, args, root_path, win_size, step=1, flag="train"):
         self.flag = flag
         self.step = step
@@ -583,6 +586,7 @@ class MSLSegLoader(Dataset):
 
 
 class SMAPSegLoader(Dataset):
+
     def __init__(self, args, root_path, win_size, step=1, flag="train"):
         self.flag = flag
         self.step = step
@@ -638,6 +642,7 @@ class SMAPSegLoader(Dataset):
 
 
 class SMDSegLoader(Dataset):
+
     def __init__(self, args, root_path, win_size, step=100, flag="train"):
         self.flag = flag
         self.step = step
@@ -690,6 +695,7 @@ class SMDSegLoader(Dataset):
 
 
 class SWATSegLoader(Dataset):
+
     def __init__(self, args, root_path, win_size, step=1, flag="train"):
         self.flag = flag
         self.step = step
@@ -767,6 +773,7 @@ class UEAloader(Dataset):
         max_seq_len: maximum sequence (time series) length. If None, script argument `max_seq_len` will be used.
             (Moreover, script argument overrides this attribute)
     """
+
     def __init__(self,
                  args,
                  root_path,
@@ -852,8 +859,8 @@ class UEAloader(Dataset):
 
         horiz_diffs = np.abs(lengths - np.expand_dims(lengths[:, 0], -1))
 
-        if (np.sum(horiz_diffs) >
-                0):  # if any row (sample) has varying length across dimensions
+        if (np.sum(horiz_diffs) > 0
+            ):  # if any row (sample) has varying length across dimensions
             df = df.applymap(subsample)
 
         lengths = df.applymap(lambda x: len(x)).values
@@ -869,10 +876,11 @@ class UEAloader(Dataset):
         # sample index (i.e. the same scheme as all datasets in this project)
 
         df = pd.concat(
-            (pd.DataFrame({col: df.loc[row, col]
-                           for col in df.columns
-                           }).reset_index(drop=True).set_index(
-                               pd.Series(lengths[row, 0] * [row]))
+            (pd.DataFrame({
+                col: df.loc[row, col]
+                for col in df.columns
+            }).reset_index(drop=True).set_index(
+                pd.Series(lengths[row, 0] * [row]))
              for row in range(df.shape[0])),
             axis=0,
         )
@@ -884,8 +892,8 @@ class UEAloader(Dataset):
         return df, labels_df
 
     def instance_norm(self, case):
-        if (self.root_path.count("EthanolConcentration") >
-                0):  # special process for numerical stability
+        if (self.root_path.count("EthanolConcentration")
+                > 0):  # special process for numerical stability
             mean = case.mean(0, keepdim=True)
             case = case - mean
             stdev = torch.sqrt(
@@ -916,6 +924,7 @@ class UEAloader(Dataset):
 
 
 class Dataset_IE_day(Dataset):
+
     def __init__(
         self,
         args,
