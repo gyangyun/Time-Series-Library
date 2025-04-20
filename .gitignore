@@ -167,5 +167,6 @@ scripts/augmentation/
 run_anylearn.py
 environment.txt
 
-dataset/
-赛题介绍.md
+new_energy_forecast/dataset/
+new_energy_forecast/outputs/
+new_energy_forecast/results/

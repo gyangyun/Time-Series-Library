@@ -1,0 +1,13 @@
+# 数据文件目录
+new_energy_forecast/dataset/
+
+# 输出和结果目录
+new_energy_forecast/outputs/
+new_energy_forecast/results/
+
+# Jupyter notebook检查点
+.ipynb_checkpoints/
+
+# 虚拟环境
+venv/
+env/ 
