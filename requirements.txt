@@ -12,3 +12,4 @@ sympy==1.11.1
 torch==2.1.2
 tqdm==4.64.1
 PyWavelets
+ray>=2.10.0

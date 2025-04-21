@@ -1163,3 +1163,162 @@ class Dataset_IE_day(Dataset):
 
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
+
+
+class Dataset_NE(Dataset):
+    """用于加载新能源预测的数据集类"""
+
+    def __init__(
+        self,
+        args,
+        root_path,
+        flag="train",
+        size=None,
+        features="MS",
+        data_path="merged_data.parquet",
+        target="power",
+        scale=True,
+        timeenc=0,
+        freq="15min",
+        seasonal_patterns=None,
+    ):
+        # size [seq_len, label_len, pred_len]
+        if size is None:
+            self.seq_len = 4 * 24 * 7  # 7天的历史数据，每15分钟一个点
+            self.label_len = 4 * 24 * 2  # 2天的重叠标签
+            self.pred_len = 4 * 24  # 1天的预测长度，每15分钟一个点
+        else:
+            self.seq_len, self.label_len, self.pred_len = size
+
+        assert flag in ["train", "test", "val", "pred"]
+        type_map = {"train": 0, "val": 1, "test": 2, "pred": 3}
+        self.set_type = type_map[flag]
+
+        self.features = features
+        self.target = target
+        self.scale = scale
+        self.timeenc = timeenc
+        self.freq = freq
+        self.args = args
+
+        self.root_path = root_path
+        self.data_path = data_path
+        self.__read_data__()
+
+    def __read_data__(self):
+        self.scaler = StandardScaler()
+        df_raw = pd.read_parquet(os.path.join(self.root_path, self.data_path))
+
+        if self.args.cols:
+            cols = [col.strip() for col in self.args.cols.split()]
+        else:
+            cols = list(df_raw.columns)
+        # 重新排列列的顺序
+        if self.features in ["MS", "S"]:
+            # 如果target为空，则默认使用cols中最后一列作为target
+            if self.target == "":
+                self.target = cols[-1]
+
+            cols = [col for col in cols if col not in ["time", self.target]]
+            df_raw = df_raw[["time"] + cols + [self.target]]
+        else:
+            # 如果target为空，则默认使用除了date外的所有列作为target
+            if self.target == "":
+                self.target = [col for col in cols if col != "time"]
+            else:
+                targets = [t.strip() for t in self.target.split()]
+                self.target = targets
+
+            cols = [col for col in cols if col not in self.target + ["time"]]
+            df_raw = df_raw[["time"] + cols + self.target]
+
+        if self.set_type != 3:  # 非预测模式
+            df_raw["time"] = pd.to_datetime(df_raw["time"])
+            df_raw.set_index("time", inplace=True)
+            df_raw.sort_index(ascending=True, inplace=True)
+
+            # 根据时间范围划分训练集、验证集和测试集
+            train_start = pd.to_datetime(self.args.train_start)
+            train_end = pd.to_datetime(self.args.train_end)
+            test_start = pd.to_datetime(self.args.test_start)
+            test_end = pd.to_datetime(self.args.test_end)
+
+            num_train = len(df_raw[train_start:train_end])
+            num_test = len(df_raw[test_start:test_end])
+            num_vali = len(df_raw) - num_train - num_test
+
+            df_raw.reset_index(inplace=True)
+
+            border1s = [
+                0,
+                num_train - self.seq_len,
+                len(df_raw) - num_test - self.seq_len,
+            ]
+            border2s = [num_train, num_train + num_vali, len(df_raw)]
+            border1 = border1s[self.set_type]
+            border2 = border2s[self.set_type]
+        else:  # 预测模式
+            df_raw["time"] = pd.to_datetime(df_raw["time"])
+            df_raw.sort_values(by="time", ascending=True, inplace=True)
+
+            pred_start = pd.to_datetime(self.args.pred_start)
+            pred_start_lookback = pred_start - pd.Timedelta(minutes=15 *
+                                                            self.seq_len)
+
+            border1 = df_raw[df_raw["time"] >= pred_start_lookback].index[0]
+            if self.args.pred_end:
+                pred_end = pd.to_datetime(self.args.pred_end)
+                border2 = df_raw[df_raw["time"] <= pred_end].index[-1] + 1
+            else:
+                border2 = border1 + self.seq_len + self.pred_len
+
+        if self.features == "M" or self.features == "MS":
+            cols_data = df_raw.columns[1:]
+            df_data = df_raw[cols_data]
+        elif self.features == "S":
+            df_data = df_raw[[self.target]]
+
+        # 数据标准化
+        if self.scale:
+            train_data = df_data[border1s[0]:border2s[0]]
+            self.scaler.fit(train_data.values)
+            data = self.scaler.transform(df_data.values)
+        else:
+            data = df_data.values
+
+        # 处理时间特征
+        df_stamp = df_raw[["time"]][border1:border2]
+        if self.timeenc == 0:
+            df_stamp["month"] = df_stamp.time.apply(lambda x: x.month)
+            df_stamp["day"] = df_stamp.time.apply(lambda x: x.day)
+            df_stamp["weekday"] = df_stamp.time.apply(lambda x: x.weekday())
+            df_stamp["hour"] = df_stamp.time.apply(lambda x: x.hour)
+            df_stamp["minute"] = df_stamp.time.apply(lambda x: x.minute)
+            data_stamp = df_stamp.drop(["time"], axis=1).values
+        elif self.timeenc == 1:
+            data_stamp = time_features(pd.to_datetime(df_stamp["time"].values),
+                                       freq=self.freq)
+            data_stamp = data_stamp.transpose(1, 0)
+
+        self.data_x = data[border1:border2]
+        self.data_y = data[border1:border2]
+        self.data_stamp = data_stamp
+
+    def __getitem__(self, index):
+        s_begin = index
+        s_end = s_begin + self.seq_len
+        r_begin = s_end - self.label_len
+        r_end = r_begin + self.label_len + self.pred_len
+
+        seq_x = self.data_x[s_begin:s_end]
+        seq_y = self.data_y[r_begin:r_end]
+        seq_x_mark = self.data_stamp[s_begin:s_end]
+        seq_y_mark = self.data_stamp[r_begin:r_end]
+
+        return seq_x, seq_y, seq_x_mark, seq_y_mark
+
+    def __len__(self):
+        return len(self.data_x) - self.seq_len - self.pred_len + 1
+
+    def inverse_transform(self, data):
+        return self.scaler.inverse_transform(data)

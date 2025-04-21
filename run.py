@@ -51,7 +51,8 @@ def create_parser():
         type=str,
         required=True,
         default="Autoformer",
-        help="model name, options: [Autoformer, Transformer, TimesNet, ETSformer, TSMixer]",
+        help=
+        "model name, options: [Autoformer, Transformer, TimesNet, ETSformer, TSMixer]",
     )
 
     # data loader
@@ -291,6 +292,10 @@ def create_parser():
                         type=str,
                         default="0,1,2,3",
                         help="device ids of multile gpus")
+    parser.add_argument("--gpu_type",
+                        type=str,
+                        default="cuda",
+                        help="gpu type")
 
     # de-stationary projector params
     parser.add_argument(
@@ -562,6 +567,7 @@ def main():
 
     parser = create_parser()
     args = parser.parse_args()
+    print(args)
     # args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
     args.use_gpu = True if torch.cuda.is_available() else False
 
@@ -571,7 +577,9 @@ def main():
         print('Using GPU')
     else:
         if hasattr(torch.backends, "mps"):
-            args.device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
+            args.device = torch.device(
+                "mps") if torch.backends.mps.is_available() else torch.device(
+                    "cpu")
         else:
             args.device = torch.device("cpu")
         print('Using cpu or mps')

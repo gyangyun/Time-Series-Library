@@ -24,6 +24,7 @@ class DataLoader:
         os.makedirs(self.raw_dir, exist_ok=True)
         os.makedirs(self.processed_dir, exist_ok=True)
 
+        # 定义数据源和变量
         self.nwp_sources = ['NWP_1', 'NWP_2', 'NWP_3']
         self.variables = {
             'NWP_1': ['u100', 'v100', 't2m', 'tp', 'tcc', 'sp', 'poai', 'ghi'],
@@ -32,33 +33,47 @@ class DataLoader:
             'NWP_3': ['u100', 'v100', 't2m', 'tp', 'tcc', 'sp', 'poai', 'ghi']
         }
 
-    def load_raw_nwp_data(self, station_id: int,
-                          source: str) -> Optional[pd.DataFrame]:
+        # 定义训练集数据文件路径
+        self.train_data_dir = os.path.join(self.raw_dir, '初赛训练集')
+        self.train_nwp_dir = os.path.join(self.train_data_dir,
+                                          'nwp_data_train')
+        self.train_fact_dir = os.path.join(self.train_data_dir, 'fact_data')
+
+        # 定义测试集数据文件路径
+        self.test_data_dir = os.path.join(self.raw_dir, '初赛测试集')
+        self.test_nwp_dir = os.path.join(self.test_data_dir, 'nwp_data_test')
+
+    def load_raw_nwp_data(self,
+                          station_id: int,
+                          source: str,
+                          dataset: str = 'train') -> Optional[pd.DataFrame]:
         """
         从原始目录加载指定场站的所有气象数据
         
         Args:
             station_id: 场站ID
             source: 气象数据源（NWP_1, NWP_2, NWP_3）
+            dataset: 数据集类型，'train' 或 'test'
             
         Returns:
             pandas.DataFrame对象或None（如果文件不存在）
         """
-        raw_dir = os.path.join(self.raw_dir, '初赛训练集/nwp_data_train',
-                               str(station_id), source)
+        # 根据数据集类型选择目录
+        if dataset == 'train':
+            raw_dir = os.path.join(self.train_nwp_dir, str(station_id), source)
+        elif dataset == 'test':
+            raw_dir = os.path.join(self.test_nwp_dir, str(station_id), source)
+        else:
+            raise ValueError("dataset参数必须是'train'或'test'")
+
         if not os.path.exists(raw_dir):
             print(f"原始目录不存在: {raw_dir}")
-            return None
-
-        # 获取所有nc文件
-        nc_files = sorted(glob(os.path.join(raw_dir, '*.nc')))
-        if not nc_files:
             return None
 
         try:
             # 读取所有文件并合并
             datasets = []
-            for file in nc_files:
+            for file in sorted(glob(os.path.join(raw_dir, '*.nc'))):
                 ds = xr.open_dataset(file)
                 # 预处理数据
                 ds = self.preprocess_nwp_data(ds)
@@ -67,28 +82,33 @@ class DataLoader:
                 datasets.append(df)
 
             # 合并所有DataFrame
-            return pd.concat(datasets, axis=0)
+            return pd.concat(datasets, axis=0) if datasets else None
         except Exception as e:
             print(
                 f"Error loading raw NWP data for station {station_id}, source {source}: {e}"
             )
             return None
 
-    def load_processed_nwp_data(self, station_id: int,
-                                source: str) -> Optional[pd.DataFrame]:
+    def load_processed_nwp_data(
+            self,
+            station_id: int,
+            source: str,
+            dataset: str = 'train') -> Optional[pd.DataFrame]:
         """
         从处理后目录加载指定场站的所有气象数据
         
         Args:
             station_id: 场站ID
             source: 气象数据源（NWP_1, NWP_2, NWP_3）
+            dataset: 数据集类型，'train' 或 'test'
             
         Returns:
             pandas.DataFrame对象或None（如果文件不存在）
         """
         processed_file = os.path.join(
             self.processed_dir,
-            f'station_{station_id}_{source}_processed.parquet')
+            f'station_{station_id}_{source}_{dataset}_processed.parquet')
+
         if not os.path.exists(processed_file):
             print(f"处理后的文件不存在: {processed_file}")
             return None
@@ -109,7 +129,7 @@ class DataLoader:
         Returns:
             pandas.DataFrame对象或None（如果文件不存在）
         """
-        raw_file = os.path.join(self.raw_dir, '初赛训练集/fact_data',
+        raw_file = os.path.join(self.train_fact_dir,
                                 f"{station_id}_normalization_train.csv")
         if not os.path.exists(raw_file):
             print(f"原始文件不存在: {raw_file}")
@@ -287,10 +307,17 @@ class DataLoader:
         df.drop(columns=['date', 'hour'], inplace=True)
         return df
 
-    def process_and_save_all_nwp_data(self):
+    def process_and_save_all_nwp_data(self, dataset: str = 'train') -> None:
         """
         处理并保存所有场站的所有气象数据为DataFrame格式
+        
+        Args:
+            dataset: 数据集类型，'train' 或 'test'
         """
+        if dataset not in ['train', 'test']:
+            raise ValueError("dataset参数必须是'train'或'test'")
+
+        print(f"\n处理{dataset}集数据...")
         for station_id in range(1, 11):
             print(f"处理场站 {station_id} 的数据...")
 
@@ -298,27 +325,27 @@ class DataLoader:
                 print(f"处理 {source} 数据...")
 
                 # 加载并处理数据
-                df = self.load_raw_nwp_data(station_id, source)
+                df = self.load_raw_nwp_data(station_id, source, dataset)
                 if df is None:
+                    print(f"无法加载场站 {station_id} 的 {source} {dataset}数据")
                     continue
 
                 # 保存为parquet格式
                 output_file = os.path.join(
                     self.processed_dir,
-                    f'station_{station_id}_{source}_processed.parquet')
+                    f'station_{station_id}_{source}_{dataset}_processed.parquet'
+                )
                 df.to_parquet(output_file)
                 print(f"已保存到: {output_file}")
 
-    def process_and_save_all_power_data(self, station_ids: List[int]) -> None:
+    def process_and_save_all_power_data(self) -> None:
         """
         处理并保存所有指定场站的功率数据
         
         Args:
             station_ids: 场站ID列表
         """
-        os.makedirs(self.processed_dir, exist_ok=True)
-
-        for station_id in station_ids:
+        for station_id in range(1, 11):
             try:
                 # 加载原始数据
                 raw_df = self.load_raw_power_data(station_id)
@@ -343,20 +370,23 @@ class DataLoader:
     def merge_power_and_nwp_data(
             self,
             station_id: int,
+            dataset: str = 'train',
             force_remerge: bool = False) -> Optional[pd.DataFrame]:
         """
         合并功率数据和气象数据，并缓存结果
         
         Args:
             station_id: 场站ID
+            dataset: 数据集类型，'train' 或 'test'
             force_remerge: 是否强制重新合并数据，即使缓存文件存在
             
         Returns:
             合并后的DataFrame，包含功率数据和三个气象数据源的数据，如果数据不存在则返回None
         """
         # 构建缓存文件路径
-        cache_file = os.path.join(self.processed_dir,
-                                  f'station_{station_id}_merged_data.parquet')
+        cache_file = os.path.join(
+            self.processed_dir,
+            f'station_{station_id}_{dataset}_merged_data.parquet')
 
         # 如果缓存文件存在且不强制重新合并，直接返回缓存数据
         if not force_remerge and os.path.exists(cache_file):
@@ -364,28 +394,35 @@ class DataLoader:
                 return pd.read_parquet(cache_file)
             except Exception as e:
                 print(f"读取缓存文件失败: {e}")
-                # 如果读取缓存失败，继续执行合并逻辑
 
         try:
-            # 加载功率数据
-            power_df = self.load_processed_power_data(station_id)
-            if power_df is None:
-                print(f"无法加载场站 {station_id} 的功率数据")
-                return None
-
             # 初始化合并后的数据框
-            merged_df = power_df.copy()
+            if dataset == 'train':
+                # 训练集包含功率数据
+                power_df = self.load_processed_power_data(station_id)
+                if power_df is None:
+                    print(f"无法加载场站 {station_id} 的功率数据")
+                    return None
+                merged_df = power_df.copy()
+            else:
+                # 创建15分钟间隔的时间序列
+                time_index = pd.date_range(start='2025-01-01 00:00:00',
+                                           end='2025-02-28 23:45:00',
+                                           freq='15min')
+                merged_df = pd.DataFrame({'time': time_index})
 
             # 加载并合并每个气象数据源的数据
             for source in self.nwp_sources:
                 # 加载气象数据
-                nwp_df = self.load_processed_nwp_data(station_id, source)
+                nwp_df = self.load_processed_nwp_data(station_id, source,
+                                                      dataset)
                 if nwp_df is None:
                     print(f"无法加载场站 {station_id} 的 {source} 数据")
                     continue
 
                 # 只选择中心点数据
-                nwp_df.query('lat == 5 and lon == 5', inplace=True)
+                nwp_df = nwp_df[nwp_df['lat'] == 5]
+                nwp_df = nwp_df[nwp_df['lon'] == 5]
 
                 # 删除lat和lon列
                 nwp_df = nwp_df.drop(['lat', 'lon'], axis=1)
@@ -397,15 +434,18 @@ class DataLoader:
                 }
                 nwp_df = nwp_df.rename(columns=rename_dict)
 
-                # 将1小时颗粒度的时间序列上采样为15分钟颗粒度
-                nwp_df = nwp_df.set_index('time').resample(
-                    '15min').ffill().reset_index()
+                # 将时间向下取整到15分钟
+                nwp_df['time'] = pd.to_datetime(
+                    nwp_df['time']).dt.floor('15min')
+
+                # 如果有重复的时间戳，取平均值
+                nwp_df = nwp_df.groupby('time').mean().reset_index()
 
                 # 合并到主数据框
                 merged_df = pd.merge(merged_df, nwp_df, on='time', how='left')
 
             # 按时间排序
-            merged_df = merged_df.sort_values('time')
+            merged_df = merged_df.sort_values('time', ascending=True)
 
             # 对气象数据进行插值，填充15分钟间隔的缺失值
             numeric_cols = merged_df.select_dtypes(include=[np.number]).columns
@@ -425,40 +465,19 @@ class DataLoader:
             print(f"合并场站 {station_id} 的数据时出错: {e}")
             return None
 
-    def load_merged_data(self, station_id: int) -> Optional[pd.DataFrame]:
-        """
-        读取已合并的数据，如果数据不存在则重新合并
-        
-        Args:
-            station_id: 场站ID
-            
-        Returns:
-            合并后的DataFrame，如果数据不存在且无法合并则返回None
-        """
-        cache_file = os.path.join(self.processed_dir,
-                                  f'station_{station_id}_merged_data.parquet')
-
-        try:
-            if os.path.exists(cache_file):
-                print(f"从缓存加载场站 {station_id} 的合并数据")
-                return pd.read_parquet(cache_file)
-            else:
-                print(f"缓存文件不存在，重新合并场站 {station_id} 的数据")
-                return self.merge_power_and_nwp_data(station_id)
-        except Exception as e:
-            print(f"加载场站 {station_id} 的合并数据时出错: {e}")
-            return None
-
-    def get_merged_data_info(self, station_id: int) -> None:
+    def get_merged_data_info(self,
+                             station_id: int,
+                             dataset: str = 'train') -> None:
         """
         打印合并后数据的信息
         
         Args:
             station_id: 场站ID
+            dataset: 数据集类型，'train' 或 'test'
         """
-        merged_df = self.merge_power_and_nwp_data(station_id)
+        merged_df = self.merge_power_and_nwp_data(station_id, dataset)
         if merged_df is not None:
-            print(f"\n场站 {station_id} 合并后的数据信息:")
+            print(f"\n场站 {station_id} {dataset}集合并后的数据信息:")
             print(f"数据形状: {merged_df.shape}")
             print(
                 f"时间范围: {merged_df['time'].min()} 到 {merged_df['time'].max()}")
@@ -474,93 +493,98 @@ class DataLoader:
 
 
 if __name__ == "__main__":
-    data_dir = Path(__file__).parent.joinpath('dataset')
+    project_root = Path(__file__).parent
+    data_dir = os.path.join(project_root, 'dataset')  # 修改数据目录路径
     loader = DataLoader(data_dir=data_dir)
 
-    # 处理并保存所有气象数据和功率数据
-    print("开始处理所有气象数据...")
-    loader.process_and_save_all_nwp_data()
+    # # 处理并保存所有气象数据和功率数据
+    # print("开始处理所有气象数据...")
+    # # 处理训练集
+    # loader.process_and_save_all_nwp_data(dataset='train')
+    # # 处理测试集
+    # loader.process_and_save_all_nwp_data(dataset='test')
 
-    print("\n开始处理所有功率数据...")
-    loader.process_and_save_all_power_data([1, 2, 3])
+    # print("\n开始处理所有功率数据...")
+    # loader.process_and_save_all_power_data()
 
-    # 测试数据加载功能
-    print("\n开始测试数据加载功能...")
+    # # 测试数据加载功能
+    # print("\n测试数据加载功能...")
 
-    # 测试气象数据加载
-    print("\n测试气象数据加载:")
-    # for station_id in range(1, 11):
-    for station_id in range(1, 2):
-        for source in ['NWP_1', 'NWP_2', 'NWP_3']:
-            print(f"\n加载场站 {station_id} 的 {source} 数据...")
+    # # 测试气象数据加载
+    # print("\n测试气象数据加载:")
+    # # for station_id in range(1, 11):
+    # for station_id in range(1, 2):
+    #     for source in ['NWP_1', 'NWP_2', 'NWP_3']:
+    #         print(f"\n加载场站 {station_id} 的 {source} 数据...")
 
-            # 测试加载原始数据
-            print("从原始目录加载:")
-            df = loader.load_raw_nwp_data(station_id, source)
-            if df is not None:
-                print(
-                    f"成功加载数据，时间范围: {df.index.get_level_values('time').min()} 到 {df.index.get_level_values('time').max()}"
-                )
-                print(f"数据列: {df.columns.tolist()}")
-                print(f"数据形状: {df.shape}")
+    #         # 测试加载原始数据
+    #         print("从原始目录加载:")
+    #         df = loader.load_raw_nwp_data(station_id, source)
+    #         if df is not None:
+    #             print(f"成功加载数据，时间范围: {df['time'].min()} 到 {df['time'].max()}")
+    #             print(f"数据列: {df.columns.tolist()}")
+    #             print(f"数据形状: {df.shape}")
 
-            # 测试加载处理后的数据
-            print("\n从处理后目录加载:")
-            df = loader.load_processed_nwp_data(station_id, source)
-            if df is not None:
-                print(
-                    f"成功加载数据，时间范围: {df.index.get_level_values('time').min()} 到 {df.index.get_level_values('time').max()}"
-                )
-                print(f"数据列: {df.columns.tolist()}")
-                print(f"数据形状: {df.shape}")
+    #         # 测试加载处理后的数据
+    #         print("\n从处理后目录加载:")
+    #         df = loader.load_processed_nwp_data(station_id, source)
+    #         if df is not None:
+    #             print(f"成功加载数据，时间范围: {df['time'].min()} 到 {df['time'].max()}")
+    #             print(f"数据列: {df.columns.tolist()}")
+    #             print(f"数据形状: {df.shape}")
 
-    # 测试功率数据加载
-    print("\n测试功率数据加载:")
-    # for station_id in range(1, 11):
-    for station_id in range(1, 2):
-        print(f"\n加载场站 {station_id} 的功率数据...")
+    # # 测试功率数据加载
+    # print("\n测试功率数据加载:")
+    # # for station_id in range(1, 11):
+    # for station_id in range(1, 2):
+    #     print(f"\n加载场站 {station_id} 的功率数据...")
 
-        # 测试加载原始数据
-        print("从原始目录加载:")
-        power_df = loader.load_raw_power_data(station_id)
-        if power_df is not None:
-            print(
-                f"成功加载数据，时间范围: {power_df['time'].min()} 到 {power_df['time'].max()}"
-            )
-            print(f"数据列: {power_df.columns.tolist()}")
-            print(f"数据行数: {len(power_df)}")
+    #     # 测试加载原始数据
+    #     print("从原始目录加载:")
+    #     power_df = loader.load_raw_power_data(station_id)
+    #     if power_df is not None:
+    #         print(
+    #             f"成功加载数据，时间范围: {power_df['time'].min()} 到 {power_df['time'].max()}"
+    #         )
+    #         print(f"数据列: {power_df.columns.tolist()}")
+    #         print(f"数据行数: {len(power_df)}")
 
-        # 测试加载处理后的数据
-        print("\n从处理后目录加载:")
-        power_df = loader.load_processed_power_data(station_id)
-        if power_df is not None:
-            print(
-                f"成功加载数据，时间范围: {power_df['time'].min()} 到 {power_df['time'].max()}"
-            )
-            print(f"数据列: {power_df.columns.tolist()}")
-            print(f"数据行数: {len(power_df)}")
-    print("\n数据加载测试完成")
+    #     # 测试加载处理后的数据
+    #     print("\n从处理后目录加载:")
+    #     power_df = loader.load_processed_power_data(station_id)
+    #     if power_df is not None:
+    #         print(
+    #             f"成功加载数据，时间范围: {power_df['time'].min()} 到 {power_df['time'].max()}"
+    #         )
+    #         print(f"数据列: {power_df.columns.tolist()}")
+    #         print(f"数据行数: {len(power_df)}")
+    # print("\n数据加载测试完成")
 
-    # 测试数据合并和缓存功能
+    # # 测试数据合并和缓存功能
     print("\n测试数据合并和缓存功能:")
-    for station_id in range(1, 2):  # 测试前3个场站
-        print(f"\n处理场站 {station_id}:")
+    for station_id in range(1, 11):
+        for dataset in ['train', 'test']:
+            print(f"\n处理场站 {station_id} 的{dataset}数据:")
 
-        # 首次合并数据（会创建缓存）
-        print("首次合并数据...")
-        merged_data = loader.merge_power_and_nwp_data(station_id)
-        if merged_data is not None:
-            print(f"合并数据形状: {merged_data.shape}")
+            # 首次合并数据（会创建缓存）
+            print("首次合并数据...")
+            merged_data = loader.merge_power_and_nwp_data(station_id, dataset)
+            if merged_data is not None:
+                print(f"合并数据形状: {merged_data.shape}")
 
-        # 从缓存加载数据
-        print("\n从缓存加载数据...")
-        cached_data = loader.load_merged_data(station_id)
-        if cached_data is not None:
-            print(f"缓存数据形状: {cached_data.shape}")
+            # # 从缓存加载数据
+            # print("\n从缓存加载数据...")
+            # cached_data = loader.merge_power_and_nwp_data(station_id, dataset)
+            # if cached_data is not None:
+            #     print(f"缓存数据形状: {cached_data.shape}")
 
-        # 强制重新合并数据
-        print("\n强制重新合并数据...")
-        remerged_data = loader.merge_power_and_nwp_data(station_id,
-                                                        force_remerge=True)
-        if remerged_data is not None:
-            print(f"重新合并数据形状: {remerged_data.shape}")
+            # # 强制重新合并数据
+            # print("\n强制重新合并数据...")
+            # remerged_data = loader.merge_power_and_nwp_data(station_id,
+            #                                                 dataset,
+            #                                                 force_remerge=True)
+            # if remerged_data is not None:
+            #     print(f"重新合并数据形状: {remerged_data.shape}")
+
+    train1 = loader.merge_power_and_nwp_data(1, 'train')
+    test1 = loader.merge_power_and_nwp_data(1, 'test')

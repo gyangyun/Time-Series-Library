@@ -170,3 +170,4 @@ environment.txt
 new_energy_forecast/dataset/
 new_energy_forecast/outputs/
 new_energy_forecast/results/
+new_energy_forecast/checkpoints/
