@@ -11,9 +11,9 @@ export target=power
 export train_epochs=10
 export patience=5
 export learning_rate=0.0001
-export batch_size=32
+export batch_size=16
 export pred_len=96  # 24小时 * 4(15分钟)
-export seq_len=1024  # 调整为2的幂次方
+export seq_len=960  # 调整为2的幂次方
 export label_len=192  # 2天 * 24小时 * 4(15分钟)
 
 # 设置模型参数
@@ -24,7 +24,7 @@ export enc_in=25  # 输入特征维度(24个气象特征 + 1个功率)
 export dec_in=25
 export c_out=1   # 输出维度(功率)
 export d_model=512
-export d_ff=2048
+export d_ff=1024
 export top_k=5
 export des='Exp'
 
