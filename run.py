@@ -16,11 +16,12 @@ from exp.exp_imputation import Exp_Imputation
 from exp.exp_short_term_forecasting import Exp_Short_Term_Forecast
 from exp.exp_anomaly_detection import Exp_Anomaly_Detection
 from exp.exp_classification import Exp_Classification
-from exp.exp_imputation import Exp_Imputation
-from exp.exp_long_term_forecasting import Exp_Long_Term_Forecast
-from exp.exp_short_term_forecasting import Exp_Short_Term_Forecast
 from utils.plot_result import plot_predict_result, plot_test_result
 from utils.print_args import print_args
+
+# 自定义的执行器
+from exp.exp_ie_forecasting import Exp_Industry_Electricity_Forecast
+from exp.exp_ne_forecasting import Exp_New_Energy_Forecast
 
 
 def create_parser():
@@ -447,10 +448,6 @@ def create_parser():
                         type=str,
                         default="",
                         help="Comma-separated list of features")
-    parser.add_argument("--use_autoregression",
-                        type=int,
-                        default=0,
-                        help="is autoregression flag")
     parser.add_argument("--use_best_params",
                         type=int,
                         default=0,
@@ -603,6 +600,10 @@ def main():
         Exp = Exp_Anomaly_Detection
     elif args.task_name == "classification":
         Exp = Exp_Classification
+    elif args.task_name == "industry_electricity_forecast":
+        Exp = Exp_Industry_Electricity_Forecast
+    elif args.task_name == "new_energy_forecast":
+        Exp = Exp_New_Energy_Forecast
     else:
         Exp = Exp_Long_Term_Forecast
 

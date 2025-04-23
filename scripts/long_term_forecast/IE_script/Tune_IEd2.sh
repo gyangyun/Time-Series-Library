@@ -12,7 +12,7 @@ model_name="TimesNet"
 # 序列长度相关参数
 seq_len=14
 label_len=7
-pred_len=1
+pred_len=1  # 改为1，因为我们要逐天预测
 
 # 模型结构参数
 n_heads=8
@@ -111,73 +111,121 @@ for province_name in "${province_names[@]}"; do
     # 在这里进行你需要的操作，例如打印路径
     echo "处理路径: ${root_path}"
     # =========================train=========================
-    # is_training=1
-    # use_autoregression=1
-    # use_best_params=0
-    # =========================test=========================
-    # is_training=0
-    # use_autoregression=0
-    # use_best_params=1
-    # =========================tune=========================
-    # is_training=3
-    # use_autoregression=1
-    # use_best_params=0
-    # =========================predict=========================
-    is_training=2
-    data_path="predict_dataset.pkl"
-    use_autoregression=1
-    use_best_params=1
-    # =========================运行脚本=========================
-    # python -u run.py \
-    # --task_name $task_name \
-    # --is_training $is_training \
-    # --root_path $root_path \
-    # --data_path $data_path \
-    # --model_id $model_id \
-    # --model $model_name \
-    # --data $data_name \
-    # --features $features \
-    # --checkpoints $checkpoints \
-    # --seq_len $seq_len \
-    # --label_len $label_len \
-    # --pred_len $pred_len \
-    # --n_heads $n_heads \
-    # --e_layers $e_layers \
-    # --d_layers $d_layers \
-    # --factor $factor \
-    # --enc_in $enc_in \
-    # --dec_in $dec_in \
-    # --c_out $c_out \
-    # --d_model $d_model \
-    # --d_ff $d_ff \
-    # --down_sampling_layers $down_sampling_layers \
-    # --down_sampling_window $down_sampling_window \
-    # --down_sampling_method $down_sampling_method \
-    # --des $description \
-    # --itr $itr \
-    # --train_epochs $train_epochs \
-    # --batch_size $batch_size \
-    # --top_k $top_k \
-    # --freq $freq \
-    # --target "${target[*]}" \
-    # --train_start $train_start \
-    # --train_end $train_end \
-    # --test_start $test_start \
-    # --test_end $test_end \
-    # --pred_start $pred_start \
-    # --pred_end $pred_end \
-    # --cols "${cols[*]}" \
-    # --use_autoregression $use_autoregression \
-    # --use_best_params $use_best_params
+    is_training=1
+    python -u run.py \
+    --task_name $task_name \
+    --is_training $is_training \
+    --root_path $root_path \
+    --data_path $data_path \
+    --model_id $model_id \
+    --model $model_name \
+    --data $data_name \
+    --features $features \
+    --checkpoints $checkpoints \
+    --seq_len $seq_len \
+    --label_len $label_len \
+    --pred_len $pred_len \
+    --n_heads $n_heads \
+    --e_layers $e_layers \
+    --d_layers $d_layers \
+    --factor $factor \
+    --enc_in $enc_in \
+    --dec_in $dec_in \
+    --c_out $c_out \
+    --d_model $d_model \
+    --d_ff $d_ff \
+    --down_sampling_layers $down_sampling_layers \
+    --down_sampling_window $down_sampling_window \
+    --down_sampling_method $down_sampling_method \
+    --des $description \
+    --itr $itr \
+    --train_epochs $train_epochs \
+    --batch_size $batch_size \
+    --top_k $top_k \
+    --freq $freq \
+    --target "${target[*]}" \
+    --train_start $train_start \
+    --train_end $train_end \
+    --test_start $test_start \
+    --test_end $test_end \
+    --cols "${cols[*]}"
+
+    # =========================predict with autoregression=========================
+    # 创建临时数据文件用于自回归预测
+    cp $data_path ${data_path%.pkl}_temp.pkl
+    
+    # 设置预测开始和结束日期
+    pred_start_date=20241001
+    pred_end_date=20241031
+    
+    # 逐天预测循环
+    current_date=$pred_start_date
+    while [ $current_date -le $pred_end_date ]; do
+        echo "正在预测日期: $current_date"
+        
+        # 运行预测
+        python -u run.py \
+        --task_name $task_name \
+        --is_training 2 \
+        --root_path $root_path \
+        --data_path ${data_path%.pkl}_temp.pkl \
+        --model_id $model_id \
+        --model $model_name \
+        --data $data_name \
+        --features $features \
+        --checkpoints $checkpoints \
+        --seq_len $seq_len \
+        --label_len $label_len \
+        --pred_len $pred_len \
+        --n_heads $n_heads \
+        --e_layers $e_layers \
+        --d_layers $d_layers \
+        --factor $factor \
+        --enc_in $enc_in \
+        --dec_in $dec_in \
+        --c_out $c_out \
+        --d_model $d_model \
+        --d_ff $d_ff \
+        --down_sampling_layers $down_sampling_layers \
+        --down_sampling_window $down_sampling_window \
+        --down_sampling_method $down_sampling_method \
+        --des $description \
+        --itr $itr \
+        --train_epochs $train_epochs \
+        --batch_size $batch_size \
+        --top_k $top_k \
+        --freq $freq \
+        --target "${target[*]}" \
+        --train_start $train_start \
+        --train_end $train_end \
+        --test_start $test_start \
+        --test_end $test_end \
+        --pred_start $current_date \
+        --pred_end $current_date \
+        --cols "${cols[*]}"
+        
+        # 更新数据集
+        python -u scripts/long_term_forecast/NE_script/update_dataset.py \
+        --data_path ${data_path%.pkl}_temp.pkl \
+        --pred_date $current_date \
+        --target_cols "${cols[*]}"
+        
+        # 更新日期到下一天
+        current_date=$(date -d "$current_date + 1 day" +%Y%m%d)
+    done
+
+    # 清理临时文件
+    rm ${data_path%.pkl}_temp.pkl
+
+    echo "预测完成！"
 done
+
 # =========================合并结果=========================
 is_training=0
-use_autoregression=1
-use_best_params=1
+use_multi=1
 root_path="${dataset_path}"
 data_path="${dataset_path}"
 checkpoints="${dataset_path}"
-use_multi=1
 
 python -u combine_result.py \
 --task_name $task_name \
@@ -218,9 +266,7 @@ python -u combine_result.py \
 --train_end $train_end \
 --test_start $test_start \
 --test_end $test_end \
---pred_start $pred_start \
---pred_end $pred_end \
+--pred_start $pred_start_date \
+--pred_end $pred_end_date \
 --cols "${cols[*]}" \
---use_autoregression $use_autoregression \
---use_best_params $use_best_params \
 --use_multi $use_multi

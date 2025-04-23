@@ -49,11 +49,9 @@ export checkpoints=$root_path/checkpoints/
 # 创建必要的目录
 mkdir -p $checkpoints
 
-# 运行训练和测试
-
-
+# 首先进行训练
 python -u run.py \
-  --task_name long_term_forecast \
+  --task_name new_energy_forecast \
   --is_training 1 \
   --root_path $root_path \
   --data_path $data_path \
@@ -92,50 +90,72 @@ python -u run.py \
   --use_gpu $use_gpu \
   --inverse
 
-# 运行预测
-# python -u run.py \
-#   --task_name long_term_forecast \
-#   --is_training 0 \
-#   --root_path $root_path \
-#   --data_path $data_path \
-#   --model_id $id \
-#   --model $model_name \
-#   --data $data \
-#   --features MS \
-#   --target $target \
-#   --freq 15min \
-#   --checkpoints $checkpoints \
-#   --seq_len $seq_len \
-#   --label_len $label_len \
-#   --pred_len $pred_len \
-#   --enc_in $enc_in \
-#   --dec_in $dec_in \
-#   --c_out $c_out \
-#   --d_model $d_model \
-#   --d_ff $d_ff \
-#   --e_layers $e_layers \
-#   --d_layers $d_layers \
-#   --factor $factor \
-#   --top_k $top_k \
-#   --des $des \
-#   --train_epochs $train_epochs \
-#   --patience $patience \
-#   --lradj type1 \
-#   --learning_rate $learning_rate \
-#   --batch_size $batch_size \
-#   --train_start $train_start \
-#   --train_end $train_end \
-#   --test_start $test_start \
-#   --test_end $test_end \
-#   --use_gpu $use_gpu \
-#   --gpu $gpu \
-#   --use_multi_gpu $use_multi_gpu \
-#   --devices $devices \
-#   --output_attention false \
-#   --use_amp true \
-#   --use_dtw false \
-#   --inverse true \
-#   --use_autoregression false \
-#   --output_dir $output_dir \
-#   --pred_start 20250101 \
-#   --pred_end 20250228 
+# 设置预测开始和结束日期
+start_date=20250101
+end_date=20250228
+
+# 创建临时数据文件
+cp $data_path ${data_path%.parquet}_temp.parquet
+
+# 逐天预测循环
+current_date=$start_date
+while [ $current_date -le $end_date ]; do
+    echo "正在预测日期: $current_date"
+    
+    # 设置预测参数
+    next_date=$(date -d "$current_date" +%Y%m%d)
+    
+    # 运行预测
+    python -u run.py \
+      --task_name new_energy_forecast \
+      --is_training 0 \
+      --root_path $root_path \
+      --data_path ${data_path%.parquet}_temp.parquet \
+      --model_id $id \
+      --model $model_name \
+      --data $data \
+      --features MS \
+      --target $target \
+      --freq t \
+      --checkpoints $checkpoints \
+      --seq_len $seq_len \
+      --label_len $label_len \
+      --pred_len $pred_len \
+      --enc_in $enc_in \
+      --dec_in $dec_in \
+      --c_out $c_out \
+      --d_model $d_model \
+      --d_ff $d_ff \
+      --e_layers $e_layers \
+      --d_layers $d_layers \
+      --factor $factor \
+      --top_k $top_k \
+      --des $des \
+      --train_epochs $train_epochs \
+      --patience $patience \
+      --lradj type1 \
+      --learning_rate $learning_rate \
+      --batch_size $batch_size \
+      --pred_start $current_date \
+      --pred_end $current_date \
+      --gpu $gpu \
+      --gpu_type $gpu_type \
+      --devices $devices \
+      --use_gpu $use_gpu \
+      --inverse \
+      --use_autoregression 1
+      
+    # 更新数据集
+    python -u scripts/long_term_forecast/NE_script/update_dataset.py \
+      --data_path ${data_path%.parquet}_temp.parquet \
+      --pred_date $current_date
+      
+    # 更新日期到下一天
+    current_date=$(date -d "$current_date + 1 day" +%Y%m%d)
+done
+
+# 清理临时文件
+rm ${data_path%.parquet}_temp.parquet
+
+echo "预测完成！"
+

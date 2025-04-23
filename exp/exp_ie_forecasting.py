@@ -25,10 +25,10 @@ from utils.tools import EarlyStopping, adjust_learning_rate, visual
 warnings.filterwarnings("ignore")
 
 
-class Exp_New_Energy_Forecast(Exp_Basic):
+class Exp_Industry_Electricity_Forecast(Exp_Basic):
 
     def __init__(self, args):
-        super(Exp_New_Energy_Forecast, self).__init__(args)
+        super(Exp_Industry_Electricity_Forecast, self).__init__(args)
 
     def _build_model(self):
         model = self.model_dict[self.args.model].Model(self.args).float()
@@ -66,14 +66,6 @@ class Exp_New_Energy_Forecast(Exp_Basic):
                 # decoder input
                 dec_inp = torch.zeros_like(
                     batch_y[:, -self.args.pred_len:, :]).float()
-
-                # 将气象预报数据填入相应位置
-                weather_dims = self.args.weather_dims if hasattr(
-                    self.args,
-                    'weather_dims') and self.args.weather_dims else list(
-                        range(batch_y.shape[-1]))
-                dec_inp[:, :, weather_dims] = batch_y[:, -self.args.pred_len:,
-                                                      weather_dims]
                 dec_inp = (torch.cat(
                     [batch_y[:, :self.args.label_len, :], dec_inp],
                     dim=1).float().to(self.device))
@@ -159,14 +151,6 @@ class Exp_New_Energy_Forecast(Exp_Basic):
                 # decoder input
                 dec_inp = torch.zeros_like(
                     batch_y[:, -self.args.pred_len:, :]).float()
-
-                # 将气象预报数据填入相应位置
-                weather_dims = self.args.weather_dims if hasattr(
-                    self.args,
-                    'weather_dims') and self.args.weather_dims else list(
-                        range(batch_y.shape[-1]))
-                dec_inp[:, :, weather_dims] = batch_y[:, -self.args.pred_len:,
-                                                      weather_dims]
                 dec_inp = (torch.cat(
                     [batch_y[:, :self.args.label_len, :], dec_inp],
                     dim=1).float().to(self.device))
@@ -290,14 +274,6 @@ class Exp_New_Energy_Forecast(Exp_Basic):
                 # decoder input
                 dec_inp = torch.zeros_like(
                     batch_y[:, -self.args.pred_len:, :]).float()
-
-                # 将气象预报数据填入相应位置
-                weather_dims = self.args.weather_dims if hasattr(
-                    self.args,
-                    'weather_dims') and self.args.weather_dims else list(
-                        range(batch_y.shape[-1]))
-                dec_inp[:, :, weather_dims] = batch_y[:, -self.args.pred_len:,
-                                                      weather_dims]
                 dec_inp = (torch.cat(
                     [batch_y[:, :self.args.label_len, :], dec_inp],
                     dim=1).float().to(self.device))
@@ -476,16 +452,9 @@ class Exp_New_Energy_Forecast(Exp_Basic):
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
-                # decoder input
-                dec_inp = torch.zeros_like(
-                    batch_y[:, -self.args.pred_len:, :]).float()
-                # 将气象预报数据填入相应位置
-                weather_dims = self.args.weather_dims if hasattr(
-                    self.args,
-                    'weather_dims') and self.args.weather_dims else list(
-                        range(batch_y.shape[-1]))
-                dec_inp[:, :, weather_dims] = batch_y[:, -self.args.pred_len:,
-                                                      weather_dims]
+                dec_inp = (torch.zeros(
+                    [batch_y.shape[0], self.args.pred_len,
+                     batch_y.shape[2]]).float().to(self.device))
                 dec_inp = (torch.cat(
                     [batch_y[:, :self.args.label_len, :], dec_inp],
                     dim=1).float().to(self.device))
