@@ -7,6 +7,26 @@ export root_path=new_energy_forecast
 export data=NEm
 export target=power
 
+# 设置特征选择参数
+station_id=$(echo $data_path | grep -o 'station_[0-9]*' | cut -d'_' -f2)
+if [ $station_id -le 5 ]; then
+    # 风电站特征 - 使用三个数据源的关键特征
+    export cols="nwp_1_v100,nwp_1_t2m,nwp_1_sp,nwp_1_u100,\
+nwp_2_v100,nwp_2_t2m,nwp_2_msl,nwp_2_u100,\
+nwp_3_v100,nwp_3_t2m,nwp_3_sp,nwp_3_u100,\
+power"
+    export enc_in=13  # 12个特征 + 1个功率
+    export dec_in=13
+else
+    # 光伏站特征 - 使用三个数据源的关键特征
+    export cols="nwp_1_poai,nwp_1_ghi,nwp_1_t2m,nwp_1_tcc,\
+nwp_2_poai,nwp_2_ghi,nwp_2_t2m,nwp_2_tcc,\
+nwp_3_poai,nwp_3_ghi,nwp_3_t2m,nwp_3_tcc,\
+power"
+    export enc_in=13  # 12个特征 + 1个功率
+    export dec_in=13
+fi
+
 # 设置训练参数
 export train_epochs=10
 export patience=5
@@ -20,8 +40,6 @@ export label_len=192  # 2天 * 24小时 * 4(15分钟)
 export e_layers=3
 export d_layers=1
 export factor=3
-export enc_in=25  # 输入特征维度(24个气象特征 + 1个功率)
-export dec_in=25
 export c_out=1   # 输出维度(功率)
 export d_model=512
 export d_ff=1024
@@ -88,7 +106,8 @@ python -u run.py \
   --gpu_type $gpu_type \
   --devices $devices \
   --use_gpu $use_gpu \
-  --inverse
+  --inverse \
+  --cols $cols
 
 # 设置预测开始和结束日期
 start_date=20250101
@@ -143,7 +162,8 @@ while [ $current_date -le $end_date ]; do
       --devices $devices \
       --use_gpu $use_gpu \
       --inverse \
-      --use_autoregression 1
+      --use_autoregression 1 \
+      --cols $cols
       
     # 更新数据集
     python -u scripts/long_term_forecast/NE_script/update_dataset.py \
