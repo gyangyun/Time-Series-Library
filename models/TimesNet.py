@@ -19,6 +19,7 @@ def FFT_for_Period(x, k=2):
 
 
 class TimesBlock(nn.Module):
+
     def __init__(self, configs):
         super(TimesBlock, self).__init__()
         self.seq_len = configs.seq_len
@@ -75,6 +76,7 @@ class Model(nn.Module):
     """
     Paper link: https://openreview.net/pdf?id=ju_Uqw384Oq
     """
+
     def __init__(self, configs):
         super(Model, self).__init__()
         self.configs = configs

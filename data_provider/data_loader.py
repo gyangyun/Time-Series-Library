@@ -6,6 +6,7 @@ import warnings
 import numpy as np
 import pandas as pd
 import torch
+import joblib
 from sklearn.preprocessing import StandardScaler
 from sktime.datasets import load_from_tsfile_to_dataframe
 from torch.utils.data import DataLoader, Dataset
@@ -975,9 +976,6 @@ class Dataset_IE_day(Dataset):
             # 如果target为空，则默认使用cols中最后一列作为target
             if self.target == "":
                 self.target = cols[-1]
-
-            cols = [col for col in cols if col not in ["date", self.target]]
-            df_raw = df_raw[["date"] + cols + [self.target]]
         else:
             # 如果target为空，则默认使用除了date外的所有列作为target
             if self.target == "":
@@ -986,8 +984,8 @@ class Dataset_IE_day(Dataset):
                 targets = [t.strip() for t in self.target.split()]
                 self.target = targets
 
-            cols = [col for col in cols if col not in self.target + ["date"]]
-            df_raw = df_raw[["date"] + cols + self.target]
+        cols = [col for col in cols if col not in ["date", self.target]]
+        df_raw = df_raw[["date"] + cols + [self.target]]
 
         if self.set_type != 3:
             df_raw["date"] = pd.to_datetime(df_raw["date"])
@@ -1165,7 +1163,7 @@ class Dataset_IE_day(Dataset):
         return self.scaler.inverse_transform(data)
 
 
-class Dataset_NE(Dataset):
+class Dataset_NE_V1(Dataset):
     """用于加载新能源预测的数据集类"""
 
     def __init__(
@@ -1207,20 +1205,19 @@ class Dataset_NE(Dataset):
 
     def __read_data__(self):
         self.scaler = StandardScaler()
-        df_raw = pd.read_parquet(os.path.join(self.root_path, self.data_path))
+        data_file_path = os.path.join(self.root_path, self.data_path)
+        df_raw = pd.read_parquet(data_file_path)
 
         if self.args.cols:
-            cols = [col.strip() for col in self.args.cols.split()]
+            cols = [col.strip() for col in self.args.cols.split(',')]
         else:
             cols = list(df_raw.columns)
-        # 重新排列列的顺序
+
+        # 重新排列列的顺序，调整成time, cols, target的顺序
         if self.features in ["MS", "S"]:
             # 如果target为空，则默认使用cols中最后一列作为target
             if self.target == "":
                 self.target = cols[-1]
-
-            cols = [col for col in cols if col not in ["time", self.target]]
-            df_raw = df_raw[["time"] + cols + [self.target]]
         else:
             # 如果target为空，则默认使用除了date外的所有列作为target
             if self.target == "":
@@ -1228,9 +1225,8 @@ class Dataset_NE(Dataset):
             else:
                 targets = [t.strip() for t in self.target.split()]
                 self.target = targets
-
-            cols = [col for col in cols if col not in self.target + ["time"]]
-            df_raw = df_raw[["time"] + cols + self.target]
+        cols = [col for col in cols if col not in ["time", self.target]]
+        df_raw = df_raw[["time"] + cols + [self.target]]
 
         if self.set_type != 3:  # 非预测模式
             df_raw["time"] = pd.to_datetime(df_raw["time"])
@@ -1283,6 +1279,16 @@ class Dataset_NE(Dataset):
             train_data = df_data[border1s[0]:border2s[0]]
             self.scaler.fit(train_data.values)
             data = self.scaler.transform(df_data.values)
+
+            # 保存scaler
+            scaler_path = data_file_path.replace('.parquet', '_scaler.pkl')
+            joblib.dump(self.scaler, scaler_path)
+
+            # 额外保存一个target的scaler
+            scaler_y = StandardScaler()
+            scaler_y.fit(df_data[self.target].values.reshape(-1, 1))
+            scaler_y_path = data_file_path.replace('.parquet', '_scaler_y.pkl')
+            joblib.dump(scaler_y, scaler_y_path)
         else:
             data = df_data.values
 
@@ -1305,7 +1311,7 @@ class Dataset_NE(Dataset):
         self.data_stamp = data_stamp
 
     def __getitem__(self, index):
-        s_begin = index
+        s_begin = index * 96  # 每次跳过96个点
         s_end = s_begin + self.seq_len
         r_begin = s_end - self.label_len
         r_end = r_begin + self.label_len + self.pred_len
@@ -1318,7 +1324,202 @@ class Dataset_NE(Dataset):
         return seq_x, seq_y, seq_x_mark, seq_y_mark
 
     def __len__(self):
-        return len(self.data_x) - self.seq_len - self.pred_len + 1
+        # 由于每次跳96个点，所以总长度要除以96
+        return (len(self.data_x) - self.seq_len - self.pred_len + 1) // 96
 
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
+
+
+class Dataset_NE_V2(Dataset):
+    """用于加载新能源预测的数据集类"""
+
+    def __init__(
+        self,
+        args,
+        root_path,
+        flag="train",
+        size=None,
+        features="MS",
+        data_path="merged_data.parquet",
+        target="power",
+        scale=True,
+        timeenc=0,
+        freq="15min",
+        seasonal_patterns=None,
+    ):
+        """
+        初始化新能源预测数据集类
+        
+        参数:
+            args: 配置参数对象
+            root_path: 数据根目录路径
+            flag: 数据集类型，可选 "train", "test", "val", "pred"
+            size: 序列长度配置，包含 [seq_len, label_len, pred_len]
+            features: 特征类型，可选 "M"(x多变量、y多变量), "MS"(x多变量、y单变量), "S"(x单变量、y单变量)
+            data_path: 数据文件路径
+            target: 目标变量名称
+            scale: 是否进行数据标准化
+            timeenc: 时间编码方式，0为默认编码，1为时间特征编码
+            freq: 数据采样频率
+            seasonal_patterns: 季节性模式
+        """
+        # size [seq_len, label_len, pred_len]
+        if size is None:
+            self.seq_len = 4 * 24 * 7  # 7天的历史数据，每15分钟一个点
+            self.label_len = 4 * 24 * 2  # 2天的重叠标签
+            self.pred_len = 4 * 24  # 1天的预测长度，每15分钟一个点
+        else:
+            self.seq_len, self.label_len, self.pred_len = size
+
+        assert flag in ["train", "test", "val", "pred"]
+        type_map = {"train": 0, "val": 1, "test": 2, "pred": 3}
+        self.set_type = type_map[flag]
+
+        self.features = features
+        self.target = target
+        self.scale = args.scale
+        self.timeenc = timeenc
+        self.freq = freq
+        self.args = args
+
+        self.root_path = root_path
+        self.data_path = data_path
+        self.__read_data__()
+
+    def __read_data__(self):
+        data_file_path = os.path.join(self.root_path, self.data_path)
+        df_raw = pd.read_parquet(data_file_path)
+
+        if self.args.cols:
+            cols = [col.strip() for col in self.args.cols.split(',')]
+        else:
+            cols = list(df_raw.columns)
+
+        # 重新排列列的顺序，调整成time, cols, target的顺序
+        if self.features in ["MS", "S"]:
+            # 如果target为空，则默认使用cols中最后一列作为target
+            if self.target == "":
+                self.target = cols[-1]
+        else:
+            # 如果target为空，则默认使用除了date外的所有列作为target
+            if self.target == "":
+                self.target = [col for col in cols if col != "time"]
+            else:
+                targets = [t.strip() for t in self.target.split()]
+                self.target = targets
+        cols = [col for col in cols if col not in ["time", self.target]]
+        df_raw = df_raw[["time"] + cols + [self.target]]
+
+        if self.set_type != 3:  # 非预测模式
+            df_raw["time"] = pd.to_datetime(df_raw["time"])
+            df_raw.set_index("time", inplace=True)
+            df_raw.sort_index(ascending=True, inplace=True)
+
+            # 根据时间范围划分训练集、验证集和测试集
+            train_start = pd.to_datetime(self.args.train_start)
+            train_end = pd.to_datetime(self.args.train_end)
+            test_start = pd.to_datetime(self.args.test_start)
+            test_end = pd.to_datetime(self.args.test_end)
+
+            # 从原数据集中截取出训练集和验证集和测试集
+            df_raw = df_raw[train_start:test_end]
+
+            num_train = len(df_raw[train_start:train_end])
+            num_test = len(df_raw[test_start:test_end])
+            num_vali = len(df_raw) - num_train - num_test
+
+            df_raw.reset_index(inplace=True)
+
+            border1s = [
+                0,
+                num_train - self.seq_len,
+                len(df_raw) - num_test - self.seq_len,
+            ]
+            border2s = [num_train, num_train + num_vali, len(df_raw)]
+            border1 = border1s[self.set_type]
+            border2 = border2s[self.set_type]
+        else:  # 预测模式
+            df_raw["time"] = pd.to_datetime(df_raw["time"])
+            df_raw.set_index("time", inplace=True)
+            df_raw.sort_index(ascending=True, inplace=True)
+
+            pred_start = pd.to_datetime(self.args.pred_start)
+            pred_end = pd.to_datetime(self.args.pred_end)
+
+            df_raw = df_raw[pred_start:pred_end]
+            df_raw.reset_index(inplace=True)
+
+            border1 = 0
+            border2 = len(df_raw)
+
+        if self.features == "M" or self.features == "MS":
+            cols_data = df_raw.columns[1:]
+            df_data = df_raw[cols_data]
+        elif self.features == "S":
+            df_data = df_raw[[self.target]]
+
+        # 数据标准化
+        if self.scale:
+            # 默认加载数据文件同名+'_scaler.pkl'文件为scaler
+            scaler_path = self.args.scaler_path if self.args.scaler_path else data_file_path.replace(
+                '.parquet', '_scaler.pkl')
+            if os.path.exists(scaler_path):
+                self.scaler = joblib.load(scaler_path)
+            else:
+                self.scaler = {}
+
+            # 新建scaler的情况
+            if not self.scaler:
+                train_data = df_data[border1s[0]:border2s[0]]
+
+                self.scaler['x_scaler'] = StandardScaler()
+                self.scaler['x_scaler'].fit(train_data.values)
+
+                self.scaler['y_scaler'] = StandardScaler()
+                # 额外保存一个处理target的scaler
+                f_dim = -1 if self.args.features == "MS" else 0
+                self.scaler['y_scaler'].fit(train_data.values[:, f_dim:])
+                joblib.dump(self.scaler, scaler_path)
+
+            data = self.scaler['x_scaler'].transform(df_data.values)
+        else:
+            data = df_data.values
+
+        # 处理时间特征
+        df_stamp = df_raw[["time"]][border1:border2]
+        if self.timeenc == 0:
+            df_stamp["month"] = df_stamp.time.apply(lambda x: x.month)
+            df_stamp["day"] = df_stamp.time.apply(lambda x: x.day)
+            df_stamp["weekday"] = df_stamp.time.apply(lambda x: x.weekday())
+            df_stamp["hour"] = df_stamp.time.apply(lambda x: x.hour)
+            df_stamp["minute"] = df_stamp.time.apply(lambda x: x.minute)
+            data_stamp = df_stamp.drop(["time"], axis=1).values
+        elif self.timeenc == 1:
+            data_stamp = time_features(pd.to_datetime(df_stamp["time"].values),
+                                       freq=self.freq)
+            data_stamp = data_stamp.transpose(1, 0)
+
+        self.data_x = data[:, :-1][border1:border2]
+        self.data_y = data[:, -1:][border1:border2]
+        self.data_stamp = data_stamp
+
+    def __getitem__(self, index):
+        s_begin = index * self.args.stride
+        s_end = s_begin + self.seq_len
+
+        seq_x = self.data_x[s_begin:s_end]
+        seq_y = self.data_y[s_begin:s_end]
+        seq_x_mark = self.data_stamp[s_begin:s_end]
+        seq_y_mark = self.data_stamp[s_begin:s_end]
+
+        return seq_x, seq_y, seq_x_mark, seq_y_mark
+
+    def __len__(self):
+        # 由于每次跳96个点，所以总长度要除以96
+        return len(self.data_x) // self.args.stride
+
+    def inverse_transform(self, data):
+        if torch.is_tensor(data):
+            data = data.cpu().numpy()
+        return self.scaler['y_scaler'].inverse_transform(data)

@@ -80,20 +80,25 @@ def plot_result(tmp_df, x, y, add_info="", dirpath=None):
             yaxis=exponent_axis,
             legend=legend,
             #  hovermode='x',
-        ),
-    )
+        ), )
     if dirpath:
         dirpath = Path(dirpath)
         if not dirpath.is_dir():
             dirpath.mkdir(parents=True)
         # tmp_fig.write_html(dirpath.joinpath(f"{title}.html"))
-        tmp_fig.write_image(dirpath.joinpath(f"{title}.png"), width=1600, height=1200)
+        tmp_fig.write_image(dirpath.joinpath(f"{title}.png"),
+                            width=1600,
+                            height=1200)
     return tmp_fig
 
 
-def plot_test_result(
-    result_dp, fig_dp, start_time, end_time, freq, scaler_y=None
-):
+def plot_test_result(result_dp,
+                     fig_dp,
+                     start_time,
+                     end_time,
+                     freq,
+                     stride=1,
+                     scaler_y=None):
     result_dp = Path(result_dp)
     fig_dp = Path(fig_dp)
 
@@ -112,31 +117,38 @@ def plot_test_result(
         # 每个时间步长的输出结果只能绘制1维，所以把第1维取出来
         tmp_pred = pred[i, :, 0]
         tmp_true = true[i, :, 0]
-        tmp_time_range = time_range[i: i+tmp_pred.shape[0]]
+        tmp_time_range = time_range[i * stride:i * stride + tmp_pred.shape[0]]
 
         if scaler_y:
             tmp_pred = scaler_y.inverse_transform(
-                np.array(tmp_pred).reshape(-1, 1)
-            ).squeeze()
+                np.array(tmp_pred).reshape(-1, 1)).squeeze()
             tmp_true = scaler_y.inverse_transform(
-                np.array(tmp_true).reshape(-1, 1)
-            ).squeeze()
+                np.array(tmp_true).reshape(-1, 1)).squeeze()
 
-        tmp_df = pd.DataFrame(
-            {"order": i, "datetime": tmp_time_range, "pred": tmp_pred, "true": tmp_true}
-        )
+        tmp_df = pd.DataFrame({
+            "order": i,
+            "datetime": tmp_time_range,
+            "pred": tmp_pred,
+            "true": tmp_true
+        })
 
         mape = mean_absolute_percentage_error(tmp_df["true"], tmp_df["pred"])
         precision = 1 - mape
         add_info = f"precision: {precision: .2%}"
-        plot_result(
-            tmp_df, x="datetime", y=["pred", "true"], add_info=add_info, dirpath=fig_dp
-        )
+        plot_result(tmp_df,
+                    x="datetime",
+                    y=["pred", "true"],
+                    add_info=add_info,
+                    dirpath=fig_dp)
 
 
-def plot_predict_result(
-    result_dp, fig_dp, start_time, end_time, freq, scaler_y=None
-):
+def plot_predict_result(result_dp,
+                        fig_dp,
+                        start_time,
+                        end_time,
+                        freq,
+                        stride=1,
+                        scaler_y=None):
     result_dp = Path(result_dp)
     fig_dp = Path(fig_dp)
 
@@ -150,15 +162,20 @@ def plot_predict_result(
     for i in range(len(pred)):
         # 每个时间步长的输出结果只能绘制1维，所以把第1维取出来
         tmp_pred = pred[i, :, 0]
-        tmp_time_range = time_range[i: i+tmp_pred.shape[0]]
+        tmp_time_range = time_range[i * stride:i * stride + tmp_pred.shape[0]]
 
         if scaler_y:
             tmp_pred = scaler_y.inverse_transform(
-                np.array(tmp_pred).reshape(-1, 1)
-            ).squeeze()
+                np.array(tmp_pred).reshape(-1, 1)).squeeze()
 
-        tmp_df = pd.DataFrame(
-            {"order": i, "datetime": tmp_time_range, "pred": tmp_pred}
-        )
+        tmp_df = pd.DataFrame({
+            "order": i,
+            "datetime": tmp_time_range,
+            "pred": tmp_pred
+        })
 
-        plot_result(tmp_df, x="datetime", y="pred", add_info="", dirpath=fig_dp)
+        plot_result(tmp_df,
+                    x="datetime",
+                    y="pred",
+                    add_info="",
+                    dirpath=fig_dp)

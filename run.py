@@ -19,10 +19,6 @@ from exp.exp_classification import Exp_Classification
 from utils.plot_result import plot_predict_result, plot_test_result
 from utils.print_args import print_args
 
-# 自定义的执行器
-from exp.exp_ie_forecasting import Exp_Industry_Electricity_Forecast
-from exp.exp_ne_forecasting import Exp_New_Energy_Forecast
-
 
 def create_parser():
     parser = argparse.ArgumentParser(description="TimesNet")
@@ -283,7 +279,10 @@ def create_parser():
     )
 
     # GPU
-    parser.add_argument("--use_gpu", type=bool, default=True, help="use gpu")
+    parser.add_argument("--use_gpu",
+                        default=True,
+                        action="store_true",
+                        help="use gpu")
     parser.add_argument("--gpu", type=int, default=0, help="gpu")
     parser.add_argument("--use_multi_gpu",
                         action="store_true",
@@ -448,10 +447,37 @@ def create_parser():
                         type=str,
                         default="",
                         help="Comma-separated list of features")
-    parser.add_argument("--use_best_params",
+    parser.add_argument("--use_future_covariates",
+                        default=False,
+                        action="store_true",
+                        help="是否使用未来协变量")
+    parser.add_argument(
+        "--future_cov_dims",
+        type=str,
+        default="",
+        help="Comma-separated list of future covariate dimensions")
+    parser.add_argument("--stride",
                         type=int,
-                        default=0,
-                        help="是否使用最优参数,0表示不使用,1表示使用")
+                        default=1,
+                        help="步长，用于获取数据集时跳着获取")
+    parser.add_argument("--scale",
+                        default=False,
+                        action="store_true",
+                        help="是否对数据集进行归一化处理")
+    parser.add_argument("--scaler_path",
+                        type=str,
+                        default="",
+                        help="归一化处理器保存路径，设置则加载归一化处理器，不设置但使用了scale参数的话就新建归一化器")
+    # 自定义损失函数的各种惩罚权重
+    parser.add_argument("--loss_alpha", type=float, default=1.5, help="低估惩罚权重")
+    parser.add_argument("--loss_beta", type=float, default=0.8, help="峰值关注权重")
+    parser.add_argument("--loss_gamma", type=float, default=0.5, help="梯度平滑权重")
+    parser.add_argument("--loss_delta", type=float, default=0, help="非负约束权重")
+    parser.add_argument("--loss_omega", type=float, default=0.5, help="高估惩罚权重")
+    parser.add_argument("--use_best_params",
+                        default=False,
+                        action="store_true",
+                        help="是否使用最优参数")
     return parser
 
 
@@ -600,10 +626,6 @@ def main():
         Exp = Exp_Anomaly_Detection
     elif args.task_name == "classification":
         Exp = Exp_Classification
-    elif args.task_name == "industry_electricity_forecast":
-        Exp = Exp_Industry_Electricity_Forecast
-    elif args.task_name == "new_energy_forecast":
-        Exp = Exp_New_Energy_Forecast
     else:
         Exp = Exp_Long_Term_Forecast
 
@@ -626,7 +648,7 @@ def main():
             torch.cuda.empty_cache()
     # 测试
     elif args.is_training == 0:
-        if args.use_best_params == 1:
+        if args.use_best_params:
             args = load_best_args(args)
 
         ii = 0
@@ -638,8 +660,15 @@ def main():
         exp.test(setting, load=True)
 
         # 新增代码，用于绘制test结果
-        scaler_y = joblib.load(os.path.join(args.root_path,
-                                            "preprocessor.bin"))["scaler_y"]
+        # 如果测试时已经做了反归一化，则scaler为None，不用额外处理
+        if args.inverse:
+            scaler = None
+        # 否则手动进行反归一化
+        else:
+            data_file_path = os.path.join(args.root_path, args.data_path)
+            scaler_path = data_file_path.replace('.parquet', '_scaler.pkl')
+            scaler = joblib.load(scaler_path)['y_scaler']
+
         result_path = os.path.join(args.root_path, setting, "test_results",
                                    "data")
         fig_path = os.path.join(args.root_path, setting, "test_results",
@@ -650,13 +679,14 @@ def main():
             args.test_start,
             args.test_end,
             args.freq,
-            scaler_y,
+            args.stride,
+            scaler,
         )
 
         torch.cuda.empty_cache()
     # 预测
     elif args.is_training == 2:
-        if args.use_best_params == 1:
+        if args.use_best_params:
             args = load_best_args(args)
 
         ii = 0
@@ -668,9 +698,15 @@ def main():
         exp.predict(setting, load=True)
         torch.cuda.empty_cache()
 
-        # 新增代码，用于绘制test结果
-        scaler_y = joblib.load(os.path.join(args.root_path,
-                                            "preprocessor.bin"))["scaler_y"]
+        # 如果测试时已经做了反归一化，则scaler为None，不用额外处理
+        if args.inverse:
+            scaler = None
+        # 否则手动进行反归一化
+        else:
+            data_file_path = os.path.join(args.root_path, args.data_path)
+            scaler_path = data_file_path.replace('.parquet', '_scaler.pkl')
+            scaler = joblib.load(scaler_path)['y_scaler']
+
         result_path = os.path.join(args.root_path, setting, "predict_results",
                                    "data")
         fig_path = os.path.join(args.root_path, setting, "predict_results",
@@ -681,7 +717,8 @@ def main():
             args.pred_start,
             args.pred_end,
             args.freq,
-            scaler_y,
+            args.stride,
+            scaler,
         )
     # 超参搜索
     elif args.is_training == 3:
